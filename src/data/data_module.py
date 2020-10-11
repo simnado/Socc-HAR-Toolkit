@@ -4,7 +4,7 @@ import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, WeightedRandomSampler, SubsetRandomSampler
 import numpy as np
-from src.data import DatabaseHandle, HarDataset, PreProcessing
+from src.data import DatabaseHandle, HarDataset, PreProcessing, DataStats
 from src.data.util import DatabaseFetcher, MediaDir
 
 
@@ -38,9 +38,11 @@ class DataModule(LightningDataModule):
         if self.classes is None:
             self.classes = self.database.classes
 
-        self.train_dataset = None
-        self.val_dataset = None
-        self.test_cl_dataset = None
+        self.datasets = dict()
+        self.stats = dict()
+        self.indices = dict()
+        self.limit_per_class = dict(train=self.max_train_samples_per_class, val=50, test=100)
+
         self.test_loc_dataset = None
 
         self.num_data_workers = num_data_workers
@@ -51,79 +53,84 @@ class DataModule(LightningDataModule):
         self.precomputed_metadata_file = metadata_path
 
         self.video_metadata = None
+        self.pre_processor = None
 
     def prepare_data(self):
-        pre_processor = PreProcessing(self.database, self.media_dir.root, Path(self.precomputed_metadata_file), res=360)
-        self.video_metadata = pre_processor.prepare_data()
+        self.pre_processor = PreProcessing(self.database, self.media_dir.root, Path(self.precomputed_metadata_file),
+                                           res=360)
+        self.video_metadata = self.pre_processor.prepare_data()
 
     def setup(self, stage: Optional[str] = None):
 
         assert self.video_metadata, "No video metadata found, run prepare_data() first"
 
+        assert stage in ['fit', 'test']
+
         # split dataset
         if stage == 'fit':
-            self.train_dataset = HarDataset(database=self.database,
-                                                       video_metadata=self.video_metadata['train'],
-                                                       res=self.res, classes=self.classes,
-                                                       normalized=True, num_frames=self.num_frames, fps=self.fps,
-                                                       mean=self.mean, std=self.std, do_augmentation=True, seed=self.seed)
-            self.mean = self.train_dataset.mean
-            self.std = self.train_dataset.std
-            self.val_dataset = HarDataset(database=self.database,
-                                                     video_metadata=self.video_metadata['val'],
-                                                     res=self.res, classes=self.classes,
-                                                     normalized=True, num_frames=self.num_frames, fps=self.fps,
-                                                     mean=self.mean, std=self.std, seed=self.seed)
+            self.datasets['train'] = HarDataset(database=self.database,
+                                                video_metadata=self.video_metadata['train'],
+                                                res=self.res, classes=self.classes,
+                                                normalized=True, num_frames=self.num_frames, fps=self.fps,
+                                                mean=self.mean, std=self.std, do_augmentation=True, seed=self.seed)
+            self.stats['train'] = DataStats('train', self.datasets['train'], self.limit_per_class['train'])
+
+            self.mean = self.datasets['train'].mean
+            self.std = self.datasets['train'].std
+
+            self.datasets['val'] = HarDataset(database=self.database,
+                                              video_metadata=self.video_metadata['val'],
+                                              res=self.res, classes=self.classes,
+                                              normalized=True, num_frames=self.num_frames, fps=self.fps,
+                                              mean=self.mean, std=self.std, seed=self.seed)
+            self.stats['val'] = DataStats('val', self.datasets['val'], self.limit_per_class['val'])
+
         if stage == 'test':
-            self.test_cl_dataset = HarDataset(database=self.database,
-                                                         video_metadata=self.video_metadata['test'],
-                                                         res=self.res, classes=self.classes,
-                                                         normalized=True, num_frames=self.num_frames, fps=self.fps,
-                                                         mean=self.mean, std=self.std,
-                                                         allow_critical=False, seed=self.seed)
+            self.datasets['test'] = HarDataset(database=self.database,
+                                               video_metadata=self.video_metadata['test'],
+                                               res=self.res, classes=self.classes,
+                                               normalized=True, num_frames=self.num_frames, fps=self.fps,
+                                               mean=self.mean, std=self.std,
+                                               seed=self.seed)
+            self.stats['test'] = DataStats('test', self.datasets['test'], self.limit_per_class['test'])
+
 
             self.test_loc_dataset = HarDataset(database=self.database,
-                                                          video_metadata=self.video_metadata['test'],
-                                                          res=self.res, classes=self.classes,
-                                                          normalized=True, num_frames=self.num_frames, fps=self.fps,
-                                                          mean=self.mean, std=self.std,
-                                                          allow_critical=True, seed=self.seed)
+                                               video_metadata=self.video_metadata['test'],
+                                               res=self.res, classes=self.classes,
+                                               normalized=True, num_frames=self.num_frames, fps=self.fps,
+                                               mean=self.mean, std=self.std,
+                                               allow_critical=True, seed=self.seed)
 
     @property
     def train_dataloader(self):
+        assert "train" in self.datasets, "No TrainingSet build, run setup('fit')"
+
         limit = self.limit_per_class['train']
-        num_samples = sum([limit] + [min(limit, self.train_dataset.stats[cls]['samples']) for cls in self.classes])
-        print(f'sample {num_samples}/{len(self.train_dataset)} clips')
-        #  sampler = WeightedRandomSampler(self.train_dataset.w, num_samples)
-        indices = torch.multinomial(torch.tensor(self.train_dataset.w), num_samples)
-        sampler = SubsetRandomSampler(indices)
-        dl = DataLoader(self.train_dataset, batch_size=self.batch_size, sampler=sampler,
+        dataset = self.datasets["train"]
+        stats = self.stats['train']
+        num_samples = sum([limit] + [min(limit, stats.samples) for _ in self.classes])
+        print(f'sample {num_samples}/{len(dataset)} clips')
+        sampler = WeightedRandomSampler(stats.weights, num_samples) # should be different each iteration
+        dl = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler,
                         num_workers=self.num_data_workers)
         return dl
 
     @property
     def val_dataloader(self):
-        limit = self.limit_per_class['val']
-        num_samples = sum([limit] + [min(limit, self.val_dataset.stats[cls]['samples']) for cls in self.classes])
-        print(f'sample {num_samples}/{len(self.val_dataset)} clips')
-        indices = torch.multinomial(torch.tensor(self.val_dataset.w), num_samples)
-        sampler = SubsetRandomSampler(indices)
-
-        dl = DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=self.num_data_workers,
+        assert "val" in self.datasets, "No ValidationSet build, run setup('fit')"
+        sampler = SubsetRandomSampler(self.indices["val"])
+        dl = DataLoader(self.datasets["val"], batch_size=self.batch_size, num_workers=self.num_data_workers,
                         sampler=sampler)
         return dl
 
     @property
-    def test_classification_dataloader(self):
-        limit = self.limit_per_class['test']
-        num_samples = sum([limit] + [min(limit, self.test_cl_dataset.stats[cls]['samples']) for cls in self.classes])
-        print(f'sample {num_samples}/{len(self.test_cl_dataset)} clips')
-        indices = torch.multinomial(torch.tensor(self.test_cl_dataset.w), num_samples)
-        sampler = SubsetRandomSampler(indices)
-
-        mnist_test = DataLoader(self.test_cl_dataset, batch_size=self.batch_size, num_workers=self.num_data_workers,
-                                sampler=sampler)
-        return mnist_test
+    def test_dataloader(self):
+        assert "test" in self.datasets, "No TestSet build, run setup('test')"
+        sampler = SubsetRandomSampler(self.indices["test"])
+        dl = DataLoader(self.datasets["test"], batch_size=self.batch_size, num_workers=self.num_data_workers,
+                        sampler=sampler)
+        return dl
 
     @property
     def test_localization_dataloader(self):
@@ -133,7 +140,3 @@ class DataModule(LightningDataModule):
     @property
     def num_classes(self):
         return len(self.classes)
-
-    @property
-    def limit_per_class(self):
-        return dict(train=self.max_train_samples_per_class, val=50, test=100)

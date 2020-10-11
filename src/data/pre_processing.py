@@ -18,6 +18,11 @@ class PreProcessing:
 
         self.media_dir = MediaDir(str(data_path.absolute()))
 
+        self.video_metadata = dict(
+            train=dict(video_paths=[], video_fps=[], video_pts=[], sac_urls=[], sac_keys=[]),
+            val=dict(video_paths=[], video_fps=[], video_pts=[], sac_urls=[], sac_keys=[]),
+            test=dict(video_paths=[], video_fps=[], video_pts=[], sac_urls=[], sac_keys=[]))
+
         self._precomputed_video_metadata = dict(
             train=dict(video_paths=[], video_fps=[], video_pts=[], sac_urls=[], sac_keys=[]),
             val=dict(video_paths=[], video_fps=[], video_pts=[], sac_urls=[], sac_keys=[]),
@@ -32,6 +37,7 @@ class PreProcessing:
             train=dict(video_paths=[], video_fps=[], video_pts=[], sac_urls=[], sac_keys=[]),
             val=dict(video_paths=[], video_fps=[], video_pts=[], sac_urls=[], sac_keys=[]),
             test=dict(video_paths=[], video_fps=[], video_pts=[], sac_urls=[], sac_keys=[]))
+        self.video_metadata = video_metadata
 
         raw_path = None
 
@@ -80,9 +86,9 @@ class PreProcessing:
                 fps = self._precomputed_video_metadata[split]['video_fps'][old_idx]
                 pts = self._precomputed_video_metadata[split]['video_pts'][old_idx]
 
-            video_metadata[split]['video_paths'].append(out_path)
+            video_metadata[split]['video_paths'].append(str(out_path))
             video_metadata[split]['video_fps'].append(fps)
-            video_metadata[split]['video_pts'].append(pts)
+            video_metadata[split]['video_pts'].append(torch.tensor(pts))
             video_metadata[split]['sac_keys'].append([key])
             video_metadata[split]['sac_urls'].append(url)
 
@@ -94,9 +100,11 @@ class PreProcessing:
             assert len(video_metadata[split]['video_pts'][-1]) > 100, "analysing failed"
 
             # 4) Delete Download
-            if raw_path and raw_path.exists() and self.res not in raw_path.name:
+            if raw_path and raw_path.exists() and f'{self.res}p' not in raw_path.name:
                 print(f'[{key}] free storage for {raw_path}')
                 raw_path.unlink()
+
+            self.video_metadata = video_metadata
 
         # check for video availability
         if len(self.not_found) > 0:

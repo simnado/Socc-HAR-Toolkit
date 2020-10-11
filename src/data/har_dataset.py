@@ -11,7 +11,7 @@ class HarDataset(Dataset):
     def __init__(self, database: DatabaseHandle, res: int, classes: [str], video_metadata: dict,
                  mean=None, std=None, normalized=True, do_augmentation=False,
                  num_frames=32, fps=15, limit_per_class=1000, seed=94,
-                 background_min_distance=3, period_max_distance=10, min_action_overlap=1, allow_critical=False, num_workers=4):
+                 background_min_distance=3, period_max_distance=10, min_action_overlap=0.99, allow_critical=False, num_workers=4):
         """
         Initializes a dataset
         @param classes: array of classes used. default will use all classes specified in csv
@@ -49,12 +49,8 @@ class HarDataset(Dataset):
         self.x = []
         # labels
         self.y = []
-        # weights for sampler
-        self.w = []
         self.info = []
         self.total_length = 0
-        self.stats = {cls: dict(actions=0, samples=0) for cls in self.classes}
-        self.stats['none'] = dict(actions=0, samples=0)
 
         # load or precompute video metadata
         self.clips_per_video = dict()
@@ -72,9 +68,6 @@ class HarDataset(Dataset):
 
     def get_samples(self):
         y = []
-
-        # store last database entry and endTime of it
-        action_set = set()
 
         print('collecting samples')
         for idx in tqdm(range(len(self.video_clips))):
@@ -97,7 +90,7 @@ class HarDataset(Dataset):
                 # sample is too far away from period boundaries
                 continue
 
-            vec, json, critical = self._get_annotations(annotations, clip_idx, action_set)
+            vec, json, critical = self._get_annotations(annotations, clip_idx)
 
             if vec is None or (critical and not self.allow_critical):
                 continue
@@ -106,28 +99,12 @@ class HarDataset(Dataset):
                 y.append(vec)
                 video_id = curr_record['url'].split('v=')[1] if 'youtube' in curr_record['url'] else curr_record['url'].split('id=')[1]
                 sample_id = f"{key}@{clip_idx}"
-                second = clip_idx / self.fps
-                self.info.append(dict(key=key, offset=clip_idx, path=path, video=video_id, critical=critical, annotations=json, id=sample_id, second=second))
+                self.info.append(dict(key=key, start=clip_idx, end=clip_idx+self.duration, path=path, video=video_id, critical=critical, annotations=json, id=sample_id))
                 self._id_2_index[sample_id] = len(self.info) - 1
 
         self.y = torch.stack(y)
 
-        # calc ratio per class
-        for idx, cls in enumerate(self.classes):
-            self.stats[cls]['ratio'] = self.stats[cls]['samples'] / len(self)
-        self.stats['none']['ratio'] = self.stats['none']['samples'] / len(self)
-
-        # calc weights per class
-        # weight is avg of background_ratio / class_ratio
-        for y in self.y:
-            factors = [
-                c.item() * self.background_ratio / self.stats[self.classes[cls]]['ratio']
-                for cls, c in enumerate(y)]
-            row_sum = torch.sum(y).item()
-            weight = sum(factors) / row_sum if row_sum > 0 else 1
-            self.w.append(weight)
-
-    def _get_annotations(self, annotations: [], clip_idx: int, action_set: set):
+    def _get_annotations(self, annotations: [], clip_idx: int):
         critical = False
         vec = torch.zeros((len(self.classes)))
         prev_border = 20
@@ -154,10 +131,6 @@ class HarDataset(Dataset):
                 index = self.classes.index(label)
                 vec[index] = 1
                 json.append(anno)
-                self.stats[label]['samples'] += 1
-                if anno['url']+str(idx) not in action_set:
-                    self.stats[label]['actions'] += 1
-                    action_set.add(anno['url']+str(idx))
             else:
                 # annotation overlap is too small
                 continue
@@ -166,8 +139,6 @@ class HarDataset(Dataset):
         if vec is not None and torch.sum(vec).item() == 0:
             if prev_border < self.background_min_distance or next_border < self.background_min_distance:
                 critical = True
-            if not critical or self.allow_critical:
-                self.stats['none']['samples'] += 1
 
         return vec, json, critical
 
@@ -190,14 +161,15 @@ class HarDataset(Dataset):
     def __len__(self):
         return len(self.x)
 
-    def get_tensor(self, index):
+    def get_tensor(self, index, resize=True):
+        print(index)
         clip_idx = self.x[index]
         try:
             frames = self.video_clips.get_clip(clip_idx)[0]
         except IndexError as err:
-            print(f'cannot access video {self.info[index]["video"]} at {self.info[index]["offset"]}')
+            print(f'cannot access video {self.info[index]["video"]} at {self.info[index]["start"]}-{self.info[index]["end"]}. Limit is {self.clips_per_video[self.info[index]["path"]]}')
             raise err
-        frames = VideoTransformation(res=self.res, do_augmentation=self.do_augmentation)(frames)
+        frames = VideoTransformation(res=self.res if resize else 360, do_augmentation=self.do_augmentation)(frames)
 
         return frames
 
@@ -231,10 +203,6 @@ class HarDataset(Dataset):
             self.clips_per_video[video_path] = num_clips
 
         return clips
-
-    @property
-    def background_ratio(self):
-        return self.stats['none']['ratio']
 
     @property
     def video_paths(self):

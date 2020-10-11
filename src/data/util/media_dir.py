@@ -1,5 +1,4 @@
 from pathlib import Path
-import os
 import re
 from datetime import datetime
 
@@ -9,8 +8,9 @@ class MediaDir:
     def __init__(self, base_dir: str):
         self.root = Path(base_dir)
 
-        os.makedirs(self.root.absolute(), exist_ok=True)
-        os.makedirs(self.root.joinpath('datasets'), exist_ok=True)
+        self.root.absolute().mkdir(exist_ok=True)
+        self.root.joinpath('datasets').mkdir(exist_ok=True)
+        self.root.joinpath('video_metadata').mkdir(exist_ok=True)
         assert self.root.exists(), "path does not exists"
 
     def database(self, filename: str):

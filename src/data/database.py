@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from typing import Optional
-from tqdm.auto import tqdm
+from itertools import chain
 
 
 class DatabaseHandle:
@@ -49,3 +49,15 @@ class DatabaseHandle:
     @property
     def video_urls(self):
         return list(set([data['url'] for key, data in self.database.items()]))
+
+    @property
+    def match_ids(self):
+        return list(set([key.split('@')[0] for key in self.database.keys()]))
+
+    @property
+    def annotations(self):
+        return list(chain(*[half['annotations'] for half in self.database.values()]))
+
+    def get_annotations(self, split: str):
+        assert split in ['train', 'val', 'test']
+        return list(chain(*[half['annotations'] for half in self.database.values() if half['subset'] == split]))
