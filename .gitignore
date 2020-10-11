@@ -1,0 +1,12 @@
+venv
+*--checkpoint.ipynb
+*--checkpoint.py
+.ipynb_checkpoints
+.idea
+*.mp4
+*.gif
+*.png
+mmaction/
+mmaction_root/
+.DS_Store
+*/**/__pycache__
