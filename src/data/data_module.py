@@ -3,7 +3,6 @@ from typing import Optional
 import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, WeightedRandomSampler, SubsetRandomSampler
-import numpy as np
 from src.data import DatabaseHandle, HarDataset, PreProcessing, DataStats
 from src.data.util import DatabaseFetcher, MediaDir
 
@@ -13,9 +12,8 @@ class DataModule(LightningDataModule):
     def __init__(self, database: str, data_dir: str, num_frames: int, res: int, fps: int, metadata_path: Optional[str],
                  batch_size=32, mean=None, std=None,
                  classes=None, max_train_samples_per_class=500,
-                 num_data_workers=None, seed=94):
+                 num_data_workers=None, seed=2147483647):
         super().__init__()
-        np.random.seed(seed)
         self.seed = seed
         self.media_dir = MediaDir(data_dir)
 
@@ -40,7 +38,6 @@ class DataModule(LightningDataModule):
 
         self.datasets = dict()
         self.stats = dict()
-        self.indices = dict()
         self.limit_per_class = dict(train=self.max_train_samples_per_class, val=50, test=100)
 
         self.test_loc_dataset = None
@@ -68,39 +65,36 @@ class DataModule(LightningDataModule):
 
         # split dataset
         if stage == 'fit':
+            # allowing spatial and temporal augmentation (one sample each second), no critical
             self.datasets['train'] = HarDataset(database=self.database,
                                                 video_metadata=self.video_metadata['train'],
                                                 res=self.res, classes=self.classes,
-                                                normalized=True, num_frames=self.num_frames, fps=self.fps,
-                                                mean=self.mean, std=self.std, do_augmentation=True, seed=self.seed)
-            self.stats['train'] = DataStats('train', self.datasets['train'], self.limit_per_class['train'])
+                                                normalized=True, do_augmentation=True,
+                                                num_frames=self.num_frames, fps=self.fps, clip_offset=self.fps,
+                                                mean=self.mean, std=self.std)
+            self.stats['train'] = DataStats('train', self.datasets['train'], self.limit_per_class['train'], seed=self.seed)
 
             self.mean = self.datasets['train'].mean
             self.std = self.datasets['train'].std
 
+            # allowing no augmentation, no overlap, no critical
             self.datasets['val'] = HarDataset(database=self.database,
                                               video_metadata=self.video_metadata['val'],
                                               res=self.res, classes=self.classes,
-                                              normalized=True, num_frames=self.num_frames, fps=self.fps,
-                                              mean=self.mean, std=self.std, seed=self.seed)
-            self.stats['val'] = DataStats('val', self.datasets['val'], self.limit_per_class['val'])
+                                              normalized=True, do_augmentation=False,
+                                              num_frames=self.num_frames, fps=self.fps, clip_offset=self.num_frames,
+                                              mean=self.mean, std=self.std)
+            self.stats['val'] = DataStats('val', self.datasets['val'], self.limit_per_class['val'], seed=self.seed)
 
         if stage == 'test':
+            # allowing no augmentation, no overlap, but critical and fixed sampling scheme
             self.datasets['test'] = HarDataset(database=self.database,
                                                video_metadata=self.video_metadata['test'],
                                                res=self.res, classes=self.classes,
-                                               normalized=True, num_frames=self.num_frames, fps=self.fps,
-                                               mean=self.mean, std=self.std,
-                                               seed=self.seed)
-            self.stats['test'] = DataStats('test', self.datasets['test'], self.limit_per_class['test'])
-
-
-            self.test_loc_dataset = HarDataset(database=self.database,
-                                               video_metadata=self.video_metadata['test'],
-                                               res=self.res, classes=self.classes,
-                                               normalized=True, num_frames=self.num_frames, fps=self.fps,
-                                               mean=self.mean, std=self.std,
-                                               allow_critical=True, seed=self.seed)
+                                               normalized=True, do_augmentation=False,
+                                               num_frames=200, fps=25, clip_offset=200,
+                                               mean=self.mean, std=self.std, allow_critical=True)
+            self.stats['test'] = DataStats('test', self.datasets['test'], self.limit_per_class['test'], seed=self.seed)
 
     @property
     def train_dataloader(self):
@@ -109,9 +103,9 @@ class DataModule(LightningDataModule):
         limit = self.limit_per_class['train']
         dataset = self.datasets["train"]
         stats = self.stats['train']
-        num_samples = sum([limit] + [min(limit, stats.samples) for _ in self.classes])
+        num_samples = sum([limit] + [min(limit, stats.samples[cls_idx]) for cls_idx, _ in enumerate(self.classes)])
         print(f'sample {num_samples}/{len(dataset)} clips')
-        sampler = WeightedRandomSampler(stats.weights, num_samples) # should be different each iteration
+        sampler = WeightedRandomSampler(stats.weights, int(num_samples))  # should be different each iteration
         dl = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler,
                         num_workers=self.num_data_workers)
         return dl
@@ -119,7 +113,8 @@ class DataModule(LightningDataModule):
     @property
     def val_dataloader(self):
         assert "val" in self.datasets, "No ValidationSet build, run setup('fit')"
-        sampler = SubsetRandomSampler(self.indices["val"])
+
+        sampler = SubsetRandomSampler(self.stats["val"].indices)
         dl = DataLoader(self.datasets["val"], batch_size=self.batch_size, num_workers=self.num_data_workers,
                         sampler=sampler)
         return dl
@@ -127,15 +122,11 @@ class DataModule(LightningDataModule):
     @property
     def test_dataloader(self):
         assert "test" in self.datasets, "No TestSet build, run setup('test')"
-        sampler = SubsetRandomSampler(self.indices["test"])
-        dl = DataLoader(self.datasets["test"], batch_size=self.batch_size, num_workers=self.num_data_workers,
-                        sampler=sampler)
-        return dl
 
-    @property
-    def test_localization_dataloader(self):
-        mnist_test = DataLoader(self.test_loc_dataset, batch_size=self.batch_size, num_workers=self.num_data_workers)
-        return mnist_test
+        # sampler = SubsetRandomSampler(self.indices["test"])
+        dl = DataLoader(self.datasets["test"], batch_size=self.batch_size, num_workers=self.num_data_workers)
+
+        return dl
 
     @property
     def num_classes(self):

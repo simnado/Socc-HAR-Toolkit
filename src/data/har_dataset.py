@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from torch.utils.data import Dataset
 from torchvision.datasets.video_utils import VideoClips
@@ -10,8 +9,9 @@ from src.data import DatabaseHandle, VideoTransformation
 class HarDataset(Dataset):
     def __init__(self, database: DatabaseHandle, res: int, classes: [str], video_metadata: dict,
                  mean=None, std=None, normalized=True, do_augmentation=False,
-                 num_frames=32, fps=15, limit_per_class=1000, seed=94,
-                 background_min_distance=3, period_max_distance=10, min_action_overlap=0.99, allow_critical=False, num_workers=4):
+                 num_frames=32, fps=15, limit_per_class=1000, clip_offset=None,
+                 background_min_distance=3, period_max_distance=10, min_action_overlap=0.99, allow_critical=False,
+                 num_workers=4):
         """
         Initializes a dataset
         @param classes: array of classes used. default will use all classes specified in csv
@@ -21,15 +21,13 @@ class HarDataset(Dataset):
         @param normalized:
         @param num_frames: number of frame to be sampled
         """
-        super(object, self)
-        np.random.seed(seed)
+        super()
 
         self.background_min_distance = background_min_distance
         self.period_max_distance = period_max_distance  # time border for samples outside a period
         self.min_action_overlap = min_action_overlap
         self.allow_critical = allow_critical
 
-        self.seed = seed
         self.classes = classes
         self.normalized = normalized
         self.do_augmentation = do_augmentation
@@ -38,6 +36,9 @@ class HarDataset(Dataset):
         self._limit_per_class = limit_per_class
         self.fps = fps
         self.duration = self.num_frames / self.fps
+        self.clip_offset = clip_offset
+        if clip_offset is None:
+            self.clip_offset = fps  # samples a clip with any second
         self.database = database
         self.video_metadata = video_metadata
         self.mean = mean
@@ -72,13 +73,15 @@ class HarDataset(Dataset):
         print('collecting samples')
         for idx in tqdm(range(len(self.video_clips))):
             video_idx, clip_idx = self.video_clips.get_clip_location(idx)
+            start = clip_idx * self.clip_offset / self.fps
+            end = start + self.duration
             keys = self.video_metadata['sac_keys'][video_idx]
             path = self.video_metadata['video_paths'][video_idx]
             records = [self.database.database[key] for key in keys]
 
             curr_record = records[0]
             key = keys[0]
-            if len(keys) == 2 and clip_idx > curr_record['segment'][1] + self.period_max_distance:
+            if len(keys) == 2 and start > curr_record['segment'][1] + self.period_max_distance:
                 curr_record = records[1]
                 key = keys[1]
 
@@ -86,11 +89,11 @@ class HarDataset(Dataset):
             period_start = curr_record['segment'][0]
             period_end = curr_record['segment'][1]
 
-            if clip_idx < period_start - self.period_max_distance or clip_idx > period_end + self.period_max_distance:
+            if end < period_start - self.period_max_distance or start > period_end + self.period_max_distance:
                 # sample is too far away from period boundaries
                 continue
 
-            vec, json, critical = self._get_annotations(annotations, clip_idx)
+            vec, json, critical = self._get_annotations(annotations, [start, end])
 
             if vec is None or (critical and not self.allow_critical):
                 continue
@@ -98,13 +101,15 @@ class HarDataset(Dataset):
                 self.x.append(idx)
                 y.append(vec)
                 video_id = curr_record['url'].split('v=')[1] if 'youtube' in curr_record['url'] else curr_record['url'].split('id=')[1]
-                sample_id = f"{key}@{clip_idx}"
-                self.info.append(dict(key=key, start=clip_idx, end=clip_idx+self.duration, path=path, video=video_id, critical=critical, annotations=json, id=sample_id))
+                sample_id = f"{key}@{start}-{end}"
+                self.info.append(dict(key=key, start=start, end=end, path=path, video=video_id, critical=critical, annotations=json, id=sample_id))
                 self._id_2_index[sample_id] = len(self.info) - 1
+                if len(self.info) < 5:
+                    print(self.info[-1])
 
         self.y = torch.stack(y)
 
-    def _get_annotations(self, annotations: [], clip_idx: int):
+    def _get_annotations(self, annotations: [], clip_segment: [int]):
         critical = False
         vec = torch.zeros((len(self.classes)))
         prev_border = 20
@@ -112,13 +117,13 @@ class HarDataset(Dataset):
         json = []
 
         for idx, anno in enumerate(annotations):
-            if anno['segment'][1] < clip_idx:
-                prev_border = min(prev_border, clip_idx - anno['segment'][1])
+            if anno['segment'][1] < clip_segment[0]:
+                prev_border = min(prev_border, clip_segment[0] - anno['segment'][1])
                 # next annotation is in the past
                 continue
 
-            next_border = min(next_border, anno['segment'][0] - clip_idx)
-            overlap = self.overlap(anno['segment'], [clip_idx, clip_idx + self.duration])
+            next_border = min(next_border, anno['segment'][0] - clip_segment[0])
+            overlap = self.overlap(anno['segment'], clip_segment)
 
             if overlap == 0:
                 # assert anno['segment'][0] > clip_idx, 'next annotation should be scheduled after current timestamp'
@@ -189,7 +194,7 @@ class HarDataset(Dataset):
         # segmentation: distance between clips is one second. clips will probably overlap
         clips = VideoClips(self.video_paths,
                            clip_length_in_frames=self.num_frames,
-                           frames_between_clips=self.fps,
+                           frames_between_clips=self.clip_offset,
                            frame_rate=self.fps,
                            num_workers=self.num_workers,
                            _precomputed_metadata=self.video_metadata

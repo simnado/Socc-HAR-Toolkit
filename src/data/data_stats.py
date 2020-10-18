@@ -4,7 +4,7 @@ from src.data import HarDataset
 
 class DataStats:
 
-    def __init__(self, split: str, dataset: HarDataset, resample_class_limit: int):
+    def __init__(self, split: str, dataset: HarDataset, resample_class_limit: int, seed=94):
         self.split = split
         self.dataset = dataset
         self.resample_class_limit = resample_class_limit
@@ -20,9 +20,13 @@ class DataStats:
         self.weights = None
         self.indices = None
 
+        self.seed = seed
+
         self._analyze()
 
     def _analyze(self):
+        torch.manual_seed(self.seed)
+
         num_classes = len(self.dataset.classes)
 
         # collect actions from annotations
