@@ -1,5 +1,3 @@
-import glob
-import os
 import random
 from typing import Optional, List
 from matplotlib import pyplot as plt
@@ -8,8 +6,7 @@ import torch
 from datetime import datetime
 from sklearn.metrics import ConfusionMatrixDisplay
 from src.data import HarDataset, DataModule, MediaDir
-from src.eval import OutDir
-from src.eval.plots import ClipPlot, PlotIterator
+from src.eval import OutDir, ClipPlot, PlotIterator
 
 
 class EvaluationModule:

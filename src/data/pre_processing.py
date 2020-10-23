@@ -121,3 +121,23 @@ class PreProcessing:
         print(f'video metadata saved to `{metadata_out_path}`')
 
         return video_metadata
+
+    def reanalyze(self, split: str, key: str):
+        idx = [idx for idx, keys in enumerate(self.video_metadata[split]['sac_keys']) if key in keys]
+        if len(idx) != 1:
+            print(f'found {len(idx)} matching entries')
+            return
+        idx = idx[0]
+
+        path = self.video_metadata[split]['video_paths'][idx]
+        old_fps = self.video_metadata[split]['video_fps'][idx]
+        old_pts = self.video_metadata[split]['video_pts'][idx]
+
+        print(f'[{key}] analyse video {path}')
+        fps, pts = self.fetch.load_timestamps(path)
+
+        print(f'finished analyzing: fps={fps} (was {old_fps}), {len(pts)} pts with max={pts[-1]} (was {len(old_pts)} pts with max={old_pts[-1]})')
+
+        self.video_metadata[split]['video_fps'][idx] = fps
+        self.video_metadata[split]['video_pts'][idx] = torch.tensor(pts)
+

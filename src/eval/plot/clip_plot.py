@@ -1,7 +1,7 @@
 from typing import Optional
+import torch
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 from matplotlib.animation import FFMpegWriter, PillowWriter
 import numpy as np
 from celluloid import Camera

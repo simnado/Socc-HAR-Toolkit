@@ -4,7 +4,8 @@ import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, WeightedRandomSampler, SubsetRandomSampler
 from src.data import DatabaseHandle, HarDataset, PreProcessing, DataStats
-from src.data.util import DatabaseFetcher, MediaDir
+from src.data.util import MediaDir
+from src.util.fetch import DatabaseFetcher
 
 
 class DataModule(LightningDataModule):
@@ -17,8 +18,8 @@ class DataModule(LightningDataModule):
         self.seed = seed
         self.media_dir = MediaDir(data_dir)
 
-        database_path = self.media_dir.database(database)
-        DatabaseFetcher.load(database, database_path)
+        data_path = self.media_dir.datasets()
+        database_path = DatabaseFetcher.load(database, data_path)
 
         assert database_path.exists(), 'Database does not exist'
 
@@ -96,7 +97,6 @@ class DataModule(LightningDataModule):
                                                mean=self.mean, std=self.std, allow_critical=True)
             self.stats['test'] = DataStats('test', self.datasets['test'], self.limit_per_class['test'], seed=self.seed)
 
-    @property
     def train_dataloader(self):
         assert "train" in self.datasets, "No TrainingSet build, run setup('fit')"
 
@@ -104,13 +104,12 @@ class DataModule(LightningDataModule):
         dataset = self.datasets["train"]
         stats = self.stats['train']
         num_samples = sum([limit] + [min(limit, stats.samples[cls_idx]) for cls_idx, _ in enumerate(self.classes)])
-        print(f'sample {num_samples}/{len(dataset)} clips')
+        print(f'sample {num_samples}/{len(dataset)} random clips')
         sampler = WeightedRandomSampler(stats.weights, int(num_samples))  # should be different each iteration
         dl = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler,
                         num_workers=self.num_data_workers)
         return dl
 
-    @property
     def val_dataloader(self):
         assert "val" in self.datasets, "No ValidationSet build, run setup('fit')"
 
@@ -119,7 +118,6 @@ class DataModule(LightningDataModule):
                         sampler=sampler)
         return dl
 
-    @property
     def test_dataloader(self):
         assert "test" in self.datasets, "No TestSet build, run setup('test')"
 

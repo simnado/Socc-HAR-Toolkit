@@ -104,8 +104,6 @@ class HarDataset(Dataset):
                 sample_id = f"{key}@{start}-{end}"
                 self.info.append(dict(key=key, start=start, end=end, path=path, video=video_id, critical=critical, annotations=json, id=sample_id))
                 self._id_2_index[sample_id] = len(self.info) - 1
-                if len(self.info) < 5:
-                    print(self.info[-1])
 
         self.y = torch.stack(y)
 
@@ -167,12 +165,11 @@ class HarDataset(Dataset):
         return len(self.x)
 
     def get_tensor(self, index, resize=True):
-        print(index)
         clip_idx = self.x[index]
         try:
             frames = self.video_clips.get_clip(clip_idx)[0]
         except IndexError as err:
-            print(f'cannot access video {self.info[index]["video"]} at {self.info[index]["start"]}-{self.info[index]["end"]}. Limit is {self.clips_per_video[self.info[index]["path"]]}')
+            print(f'cannot access video {self.info[index]["key"]} at {self.info[index]["start"]}-{self.info[index]["end"]}. Limit is {self.clips_per_video[self.info[index]["path"]]}')
             raise err
         frames = VideoTransformation(res=self.res if resize else 360, do_augmentation=self.do_augmentation)(frames)
 
