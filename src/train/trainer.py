@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Optional
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint, ProgressBar
 from pytorch_lightning import Trainer as LightningTrainer
-
 from src.train.callbacks.reporter import Reporter
 
 

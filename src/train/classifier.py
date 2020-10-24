@@ -121,7 +121,6 @@ class Classifier(LightningModule):
             self.epoch_start = time.time()
 
         x, y, info = batch
-        ids = np.array(info['id'])
         out = self(x)
         losses = self.loss(out, y)
         batch_loss = losses.mean()
@@ -133,17 +132,21 @@ class Classifier(LightningModule):
         self.log('batch_loss', batch_loss, prog_bar=True, logger=True, on_step=True, on_epoch=False)
         self.log('train_loss', batch_loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)
 
-        return {'y': y, 'scores': scores, 'losses': losses, 'ids': ids, 'batch_loss': batch_loss}
+        print('loss=')
+        print(batch_loss)
+
+        return {'y': y, 'scores': scores, 'losses': losses, 'meta': info, 'loss': batch_loss}
         # self.log('prediction', pred, reduce_fx=lambda x: np.hstack(x), prog_bar=False, logger=False)
         # self.log('y', y, reduce_fx=lambda x: np.hstack(x), prog_bar=False, logger=False)
         # self.log('ids', ids, reduce_fx=lambda x: np.hstack(x), prog_bar=False, logger=False)  # todo: log whole info objects?
 
     def training_epoch_end(self, outputs):
+        self.out = outputs
 
         y = np.hstack(outputs.y)[0]
         scores = np.hstack(outputs.scores)[0]
         losses = np.hstack(outputs.losses)[0]
-        ids = np.hstack(outputs.ids)[0]
+        ids = np.hstack(outputs.meta)[0]
 
         # prevent half precision metric bugs
         # y = torch.FloatTensor(torch.tensor(y).to(torch.float32).tolist())
@@ -287,7 +290,7 @@ class Classifier(LightningModule):
 
     @property
     def trainable_layers(self):
-        return self.backbone.groups[0:self.hparams.trainable_groups]
+        return self.backbone.groups[::-1][0:self.hparams.trainable_groups]
 
     @property
     def lrs(self):
@@ -304,3 +307,11 @@ class Classifier(LightningModule):
                 return True
 
         return False
+
+    @staticmethod
+    def collate(batch):
+        transposed_data = list(zip(*batch))
+        x = torch.stack(transposed_data[0], 0)
+        y = torch.stack(transposed_data[1], 0)
+        info = itertools.chain(*transposed_data[2])
+        return x, y, info

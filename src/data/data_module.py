@@ -107,7 +107,7 @@ class DataModule(LightningDataModule):
         print(f'sample {num_samples}/{len(dataset)} random clips')
         sampler = WeightedRandomSampler(stats.weights, int(num_samples))  # should be different each iteration
         dl = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler,
-                        num_workers=self.num_data_workers)
+                        num_workers=self.num_data_workers, collate_fn=self.collate)
         return dl
 
     def val_dataloader(self):
@@ -115,17 +115,26 @@ class DataModule(LightningDataModule):
 
         sampler = SubsetRandomSampler(self.stats["val"].indices)
         dl = DataLoader(self.datasets["val"], batch_size=self.batch_size, num_workers=self.num_data_workers,
-                        sampler=sampler)
+                        sampler=sampler, collate_fn=self.collate)
         return dl
 
     def test_dataloader(self):
         assert "test" in self.datasets, "No TestSet build, run setup('test')"
 
         # sampler = SubsetRandomSampler(self.indices["test"])
-        dl = DataLoader(self.datasets["test"], batch_size=self.batch_size, num_workers=self.num_data_workers)
+        dl = DataLoader(self.datasets["test"], batch_size=self.batch_size, num_workers=self.num_data_workers,
+                        collate_fn=self.collate)
 
         return dl
 
     @property
     def num_classes(self):
         return len(self.classes)
+
+    @staticmethod
+    def collate(batch):
+        transposed_data = list(zip(*batch))
+        x = torch.stack(transposed_data[0], 0)
+        y = torch.stack(transposed_data[1], 0)
+        info = list(transposed_data[2])
+        return x, y, info
