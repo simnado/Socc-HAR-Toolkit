@@ -7,6 +7,7 @@ from pytorch_lightning.core.memory import ModelSummary
 from torch.nn import BCEWithLogitsLoss
 from torch.optim.lr_scheduler import ReduceLROnPlateau, OneCycleLR
 from pytorch_lightning.core.lightning import LightningModule
+from pytorch_lightning.metrics import Accuracy
 
 from src.arch.backbone import Backbone
 from src.eval import hamming, roc_auc
@@ -38,8 +39,11 @@ class Classifier(LightningModule):
         self.loss = BCEWithLogitsLoss(reduction='none')
 
         self.train_iterations = train_iterations
+        self.epoch_start = None
 
-        self.epoch_start = time.time()
+        # metrics
+        self.train_acc = Accuracy()
+        self.val_acc = Accuracy()
 
     def forward(self, x):
         # batch_size, channels, frames, width, height = x.size()
@@ -123,53 +127,25 @@ class Classifier(LightningModule):
         x, y, info = batch
         out = self(x)
         losses = self.loss(out, y)
+        losses = torch.mean(losses, dim=1)  # reduce per sample
         batch_loss = losses.mean()
         scores = torch.sigmoid(out)
 
-        # y = y.cpu().detach().numpy()
-        # pred = pred.cpu().detach().numpy()
+        self.train_acc(scores, y)
 
         self.log('batch_loss', batch_loss, prog_bar=True, logger=True, on_step=True, on_epoch=False)
         self.log('train_loss', batch_loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)
-
-        print('loss=')
-        print(batch_loss)
+        self.log('train_acc', self.train_acc, prog_bar=True, logger=True, on_step=False, on_epoch=True)
 
         return {'y': y, 'scores': scores, 'losses': losses, 'meta': info, 'loss': batch_loss}
-        # self.log('prediction', pred, reduce_fx=lambda x: np.hstack(x), prog_bar=False, logger=False)
-        # self.log('y', y, reduce_fx=lambda x: np.hstack(x), prog_bar=False, logger=False)
-        # self.log('ids', ids, reduce_fx=lambda x: np.hstack(x), prog_bar=False, logger=False)  # todo: log whole info objects?
 
     def training_epoch_end(self, outputs):
-        self.out = outputs
-
-        y = np.hstack(outputs.y)[0]
-        scores = np.hstack(outputs.scores)[0]
-        losses = np.hstack(outputs.losses)[0]
-        ids = np.hstack(outputs.meta)[0]
-
-        # prevent half precision metric bugs
-        # y = torch.FloatTensor(torch.tensor(y).to(torch.float32).tolist())
-        # pred = torch.FloatTensor(torch.tensor(pred).to(torch.float32).tolist())
-
-        # loss = outputs.batch_loss.mean()
-        acc = 1 - hamming(y, scores)
-        micro_auc, macro_auc = 0, 0
-
-        try:
-            micro_auc, macro_auc, _ = roc_auc(y, scores)
-        except ValueError as err:
-            print('cannot calculate roc: ')
-            print(err)
 
         train_time = time.time() - self.epoch_start
 
-        self.log('train_acc', acc, on_epoch=True)
-        self.log('train_micro_auc', micro_auc, on_epoch=True)
-        self.log('train_macro_auc', macro_auc, on_epoch=True)
+        #self.log('train_micro_auc', micro_auc, on_epoch=True)
+        #self.log('train_macro_auc', macro_auc, on_epoch=True)
         self.log('train_time', train_time, on_epoch=True)
-
-        return {'y': y, 'scores': scores, 'losses': losses, 'ids': ids}
 
     # Validation stuff from here
 
@@ -178,43 +154,38 @@ class Classifier(LightningModule):
         x, y, info = batch
         out = self(x)
         losses = self.loss(out, y)
+        losses = torch.mean(losses, dim=1)  # reduce per sample
+
         batch_loss = losses.mean()
         scores = torch.sigmoid(out)
 
-        # y = y.cpu().detach()
-        # pred = pred.cpu().detach()
+        self.val_acc(scores, y)
 
         self.log('val_loss', batch_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+        self.log('val_acc', self.val_acc, prog_bar=True, logger=True, on_step=False, on_epoch=True)
 
-        return {'y': y, 'scores': scores, 'losses': losses, 'ids': np.array(info['id'])}
+        return {'y': y, 'scores': scores, 'losses': losses, 'meta': info}
 
     def validation_epoch_end(self, outputs):
-
-        y = np.hstack(outputs.y)[0]
-        scores = np.hstack(outputs.scores)[0]
-        losses = np.hstack(outputs.losses)[0]
-        ids = np.hstack(outputs.ids)[0]
 
         # prevent half precision metric bugs
         # y = torch.FloatTensor(y.to(torch.float32).tolist())
         # pred = torch.FloatTensor(pred.to(torch.float32).tolist())
 
-        acc = 1 - hamming(y, scores)
+        #acc = 1 - hamming(y, scores)
 
-        micro_auc, macro_auc = 0, 0
+        #micro_auc, macro_auc = 0, 0
 
-        try:
-            micro_auc, macro_auc, _ = roc_auc(y, scores)
+        #try:
+        #    micro_auc, macro_auc, _ = roc_auc(y, scores)
 
-        except ValueError as err:
-            print('cannot calculate roc: ')
-            print(err)
+        #except ValueError as err:
+        #    print('cannot calculate roc: ')
+        #    print(err)
 
-        self.log('val_acc', acc, prog_bar=True)
-        self.log('val_macro_auc', macro_auc)
-        self.log('val_micro_auc', micro_auc)
-
-        return {'y': y, 'scores': scores, 'losses': losses, 'ids': ids}
+        #self.log('val_macro_auc', macro_auc)
+        #self.log('val_micro_auc', micro_auc)
+        print('val epoch ends')
 
     # Test stuff from here
 
@@ -223,6 +194,8 @@ class Classifier(LightningModule):
         x, y, info = batch
         out = self(x)
         losses = self.loss(out, y)
+        losses = torch.mean(losses, dim=1)  # reduce per sample
+
         batch_loss = losses.mean()
         scores = torch.sigmoid(out)
 
@@ -234,28 +207,25 @@ class Classifier(LightningModule):
         return {'y': y, 'scores': scores, 'losses': losses, 'ids': np.array(info['id'])}
 
     def test_epoch_end(self, outputs):
-        y = outputs.y
-        pred = outputs.test_predictions
-        losses = np.hstack(outputs.losses)[0]
-        ids = np.hstack(outputs.ids)
 
         # prevent half precision metric bugs
         # y = torch.FloatTensor(y.to(torch.float32).tolist())
         # pred = torch.FloatTensor(pred.to(torch.float32).tolist())
 
-        acc = 1 - hamming(y, pred)
-        micro_auc, macro_auc = 0, 0
+        #acc = 1 - hamming(y, pred)
+        #micro_auc, macro_auc = 0, 0
 
-        try:
-            micro_auc, macro_auc, _ = roc_auc(y, pred)
+        #try:
+        #    micro_auc, macro_auc, _ = roc_auc(y, pred)
 
-        except ValueError as err:
-            print('cannot calculate roc: ')
-            print(err)
+        #except ValueError as err:
+        #    print('cannot calculate roc: ')
+        #    print(err)
 
-        self.log('val_acc', acc, prog_bar=True)
-        self.log('test_macro_auc', macro_auc)
-        self.log('test_micro_auc', micro_auc)
+        #self.log('val_acc', acc, prog_bar=True)
+        #self.log('test_macro_auc', macro_auc)
+        #self.log('test_micro_auc', micro_auc)
+        pass
 
     def count_parameters(self):
         trainable_parameters = 0
@@ -308,10 +278,3 @@ class Classifier(LightningModule):
 
         return False
 
-    @staticmethod
-    def collate(batch):
-        transposed_data = list(zip(*batch))
-        x = torch.stack(transposed_data[0], 0)
-        y = torch.stack(transposed_data[1], 0)
-        info = itertools.chain(*transposed_data[2])
-        return x, y, info
