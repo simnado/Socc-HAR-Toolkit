@@ -1,4 +1,5 @@
 import itertools
+import math
 from pathlib import Path
 import numpy as np
 import time
@@ -7,10 +8,8 @@ from pytorch_lightning.core.memory import ModelSummary
 from torch.nn import BCEWithLogitsLoss
 from torch.optim.lr_scheduler import ReduceLROnPlateau, OneCycleLR
 from pytorch_lightning.core.lightning import LightningModule
-from pytorch_lightning.metrics import Accuracy
-
 from src.arch.backbone import Backbone
-from src.eval import hamming, roc_auc
+from src.eval.metrics import MultiLabelStatScores
 
 
 class Classifier(LightningModule):
@@ -36,18 +35,20 @@ class Classifier(LightningModule):
 
         self.num_classes = num_classes
 
-        self.loss = BCEWithLogitsLoss(reduction='none')
+        self.reportLoss = BCEWithLogitsLoss(reduction='none')
+        self.loss = BCEWithLogitsLoss(reduction='mean')
 
         self.train_iterations = train_iterations
         self.epoch_start = None
 
         # metrics
-        self.train_acc = Accuracy()
-        self.val_acc = Accuracy()
+        self.train_stat_scores = MultiLabelStatScores(self.num_classes, threshold=0.5)
+        self.val_stat_scores = MultiLabelStatScores(self.num_classes, threshold=0.5)
 
     def forward(self, x):
         # batch_size, channels, frames, width, height = x.size()
         # todo: data layer
+        # todo: transforms
         return self.backbone(x)
 
     def configure_optimizers(self):
@@ -73,7 +74,7 @@ class Classifier(LightningModule):
         else:
             raise Exception('no optimizer set')
 
-        total_steps = int(self.hparams.epochs * self.train_iterations / self.hparams.accumulate_grad_batches)
+        total_steps = math.ceil(self.hparams.epochs * self.train_iterations / self.hparams.accumulate_grad_batches)
         if self.hparams.scheduler == 'cosine':
             print(f'start cosine annealing with {self.train_iterations} iterations')
             # lr_scheduler = CosineAnnealingLR(optimizer, iterations)
@@ -126,16 +127,16 @@ class Classifier(LightningModule):
 
         x, y, info = batch
         out = self(x)
-        losses = self.loss(out, y)
+        losses = self.reportLoss(out, y)
         losses = torch.mean(losses, dim=1)  # reduce per sample
-        batch_loss = losses.mean()
+        # todo: is this a problem? batch_loss = losses.mean()
+        batch_loss = self.loss(out, y)
         scores = torch.sigmoid(out)
 
-        self.train_acc(scores, y)
+        self.train_stat_scores(scores, y)
 
-        self.log('batch_loss', batch_loss, prog_bar=True, logger=True, on_step=True, on_epoch=False)
-        self.log('train_loss', batch_loss, prog_bar=True, logger=True, on_step=False, on_epoch=True)
-        self.log('train_acc', self.train_acc, prog_bar=True, logger=True, on_step=False, on_epoch=True)
+        self.log('train_loss', batch_loss, prog_bar=True, on_step=True, on_epoch=True)
+        self.log('batch_acc', self.train_stat_scores.balanced_accuracy('macro'), prog_bar=True)
 
         return {'y': y, 'scores': scores, 'losses': losses, 'meta': info, 'loss': batch_loss}
 
@@ -143,8 +144,11 @@ class Classifier(LightningModule):
 
         train_time = time.time() - self.epoch_start
 
-        #self.log('train_micro_auc', micro_auc, on_epoch=True)
-        #self.log('train_macro_auc', macro_auc, on_epoch=True)
+        self.log('train_precision_macro', self.train_stat_scores.precision('macro'))
+        self.log('train_recall_macro', self.train_stat_scores.recall('macro'))
+        self.log('train_balanced_acc_macro', self.train_stat_scores.balanced_accuracy('macro'), prog_bar=True)
+        self.log('train_balanced_acc_micro', self.train_stat_scores.balanced_accuracy('micro'))
+        self.log('train_hamming_loss', self.train_stat_scores.hamming_loss())
         self.log('train_time', train_time, on_epoch=True)
 
     # Validation stuff from here
@@ -153,39 +157,26 @@ class Classifier(LightningModule):
 
         x, y, info = batch
         out = self(x)
-        losses = self.loss(out, y)
+        losses = self.reportLoss(out, y)
         losses = torch.mean(losses, dim=1)  # reduce per sample
 
         batch_loss = losses.mean()
         scores = torch.sigmoid(out)
 
-        self.val_acc(scores, y)
+        self.val_stat_scores(scores, y)
 
-        self.log('val_loss', batch_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-        self.log('val_acc', self.val_acc, prog_bar=True, logger=True, on_step=False, on_epoch=True)
+        self.log('val_loss', batch_loss, prog_bar=True, on_step=True)
+        self.log('val_acc', self.val_stat_scores.balanced_accuracy('macro'), prog_bar=True, on_step=True, on_epoch=True)
 
         return {'y': y, 'scores': scores, 'losses': losses, 'meta': info}
 
     def validation_epoch_end(self, outputs):
 
-        # prevent half precision metric bugs
-        # y = torch.FloatTensor(y.to(torch.float32).tolist())
-        # pred = torch.FloatTensor(pred.to(torch.float32).tolist())
-
-        #acc = 1 - hamming(y, scores)
-
-        #micro_auc, macro_auc = 0, 0
-
-        #try:
-        #    micro_auc, macro_auc, _ = roc_auc(y, scores)
-
-        #except ValueError as err:
-        #    print('cannot calculate roc: ')
-        #    print(err)
-
-        #self.log('val_macro_auc', macro_auc)
-        #self.log('val_micro_auc', micro_auc)
-        print('val epoch ends')
+        self.log('val_precision_macro', self.val_stat_scores.precision('macro'))
+        self.log('val_recall_macro', self.val_stat_scores.recall('macro'))
+        self.log('val_balanced_acc_macro', self.val_stat_scores.balanced_accuracy('macro'), prog_bar=True)
+        self.log('val_balanced_acc_micro', self.val_stat_scores.balanced_accuracy('micro'))
+        self.log('val_hamming_loss', self.val_stat_scores.hamming_loss())
 
     # Test stuff from here
 
@@ -193,14 +184,11 @@ class Classifier(LightningModule):
 
         x, y, info = batch
         out = self(x)
-        losses = self.loss(out, y)
+        losses = self.reportLoss(out, y)
         losses = torch.mean(losses, dim=1)  # reduce per sample
 
         batch_loss = losses.mean()
         scores = torch.sigmoid(out)
-
-        # y = y.cpu().detach()
-        # pred = pred.cpu().detach()
 
         self.log('test_loss', batch_loss, prog_bar=True, logger=True, on_epoch=True, on_step=True)
 

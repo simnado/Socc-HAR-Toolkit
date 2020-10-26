@@ -4,6 +4,8 @@ from pytorch_lightning import Callback
 import torch
 import pandas as pd
 
+from src.eval import MultiLabelStatCurves
+
 
 class Reporter(Callback):
 
@@ -21,6 +23,9 @@ class Reporter(Callback):
         self.train_data = None
         self.val_data = None
         self.test_data = None
+
+        self.train_stat_curves = MultiLabelStatCurves(len(self.classes))
+        self.val_stat_curves = MultiLabelStatCurves(len(self.classes))
 
         self.df = pd.DataFrame(
             columns=['subset', 'key', 'video', 'start', 'end', 'labels', 'critical', 'epoch', 'index', 'y', 'scores',
@@ -41,6 +46,11 @@ class Reporter(Callback):
             self.push(self.train_data, outputs)
 
     def on_train_epoch_end(self, trainer, pl_module, outputs):
+        self.train_stat_curves.reset()
+        self.train_stat_curves(self.train_data['scores'], self.train_data['y'])
+        pl_module.log('train_auroc_micro', self.train_stat_curves.auroc('micro'))
+        pl_module.log('train_auroc_macro', self.train_stat_curves.auroc('macro'))
+
         self._save_worst_samples('train', self.train_data, trainer.current_epoch)
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
@@ -59,6 +69,11 @@ class Reporter(Callback):
             self.push(self.test_data, outputs)
 
     def on_test_epoch_end(self, trainer, pl_module):
+        self.val_stat_curves.reset()
+        self.val_stat_curves(self.val_data['scores'], self.val_data['y'])
+        pl_module.log('val_auroc_micro', self.val_stat_curves.auroc('micro'))
+        pl_module.log('val_auroc_macro', self.val_stat_curves.auroc('macro'))
+
         self._save_worst_samples('test', self.test_data, trainer.current_epoch)
 
     def _save_worst_samples(self, context: str, data: dict, epoch: int):
@@ -92,4 +107,4 @@ class Reporter(Callback):
         data['y'] = torch.cat([data['y'], out['y']], dim=0)
         data['scores'] = torch.cat([data['scores'], out['scores']], dim=0)
         data['losses'] = torch.cat([data['losses'], out['losses']], dim=0)
-        data['meta'].append(*out['meta'])
+        data['meta'] += out['meta']

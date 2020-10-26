@@ -1,5 +1,6 @@
 from pathlib import Path
 from torch import nn
+import torch
 from src.arch.backbone import Backbone
 from src.util.fetch import Fetcher
 
@@ -24,11 +25,11 @@ class R2Plus1D_34(Backbone):
             backbone=dict(
                 type='ResNet2Plus1d',
                 depth=34,
-                pretrained=checkpoints_exp,
+                pretrained=str(checkpoints_exp),
                 pretrained2d=False,
                 norm_eval=False,
                 conv_cfg=dict(type='Conv2plus1d'),
-                norm_cfg=dict(type='SyncBN', requires_grad=True, eps=1e-3),
+                norm_cfg=dict(type='BN3d', requires_grad=True, eps=1e-3),  # changed from SyncBN
                 act_cfg=dict(type='ReLU', inplace=True),
                 conv1_kernel=(3, 7, 7),
                 conv1_stride_t=1,

@@ -72,7 +72,8 @@ class DataModule(LightningDataModule):
                                                 res=self.res, classes=self.classes,
                                                 normalized=True, do_augmentation=True,
                                                 num_frames=self.num_frames, fps=self.fps, clip_offset=self.fps,
-                                                mean=self.mean, std=self.std)
+                                                mean=self.mean, std=self.std,
+                                                num_workers=0)
             self.stats['train'] = DataStats('train', self.datasets['train'], self.limit_per_class['train'], seed=self.seed)
 
             self.mean = self.datasets['train'].mean
@@ -84,7 +85,8 @@ class DataModule(LightningDataModule):
                                               res=self.res, classes=self.classes,
                                               normalized=True, do_augmentation=False,
                                               num_frames=self.num_frames, fps=self.fps, clip_offset=self.num_frames,
-                                              mean=self.mean, std=self.std)
+                                              mean=self.mean, std=self.std,
+                                              num_workers=0)
             self.stats['val'] = DataStats('val', self.datasets['val'], self.limit_per_class['val'], seed=self.seed)
 
         if stage == 'test':
@@ -94,7 +96,8 @@ class DataModule(LightningDataModule):
                                                res=self.res, classes=self.classes,
                                                normalized=True, do_augmentation=False,
                                                num_frames=200, fps=25, clip_offset=200,
-                                               mean=self.mean, std=self.std, allow_critical=True)
+                                               mean=self.mean, std=self.std, allow_critical=True,
+                                               num_workers=0)
             self.stats['test'] = DataStats('test', self.datasets['test'], self.limit_per_class['test'], seed=self.seed)
 
     def train_dataloader(self):
@@ -135,6 +138,7 @@ class DataModule(LightningDataModule):
     def collate(batch):
         transposed_data = list(zip(*batch))
         x = torch.stack(transposed_data[0], 0)
+        print(f'collate {x.shape[0]} samples to one batch')
         y = torch.stack(transposed_data[1], 0)
         info = list(transposed_data[2])
         return x, y, info
