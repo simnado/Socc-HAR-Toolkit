@@ -124,6 +124,7 @@ class Classifier(LightningModule):
     def training_step(self, batch, batch_idx):
         if batch_idx == 0:
             self.epoch_start = time.time()
+            self.train_stat_scores.reset()
 
         x, y, info = batch
         out = self(x)
@@ -136,7 +137,7 @@ class Classifier(LightningModule):
         self.train_stat_scores(scores, y)
 
         self.log('train_loss', batch_loss, prog_bar=True, on_step=True, on_epoch=True)
-        self.log('batch_acc', self.train_stat_scores.balanced_accuracy('macro'), prog_bar=True)
+        self.log('batch_acc', self.train_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
 
         return {'y': y, 'scores': scores, 'losses': losses, 'meta': info, 'loss': batch_loss}
 
@@ -146,6 +147,7 @@ class Classifier(LightningModule):
 
         self.log('train_precision_macro', self.train_stat_scores.precision('macro'))
         self.log('train_recall_macro', self.train_stat_scores.recall('macro'))
+        self.log('train_balanced_acc_weighted', self.train_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
         self.log('train_balanced_acc_macro', self.train_stat_scores.balanced_accuracy('macro'), prog_bar=True)
         self.log('train_balanced_acc_micro', self.train_stat_scores.balanced_accuracy('micro'))
         self.log('train_hamming_loss', self.train_stat_scores.hamming_loss())
@@ -154,6 +156,9 @@ class Classifier(LightningModule):
     # Validation stuff from here
 
     def validation_step(self, batch, batch_idx):
+
+        if batch_idx == 0:
+            self.val_stat_scores.reset()
 
         x, y, info = batch
         out = self(x)
@@ -166,7 +171,7 @@ class Classifier(LightningModule):
         self.val_stat_scores(scores, y)
 
         self.log('val_loss', batch_loss, prog_bar=True, on_step=True)
-        self.log('val_acc', self.val_stat_scores.balanced_accuracy('macro'), prog_bar=True, on_step=True, on_epoch=True)
+        self.log('val_acc', self.val_stat_scores.balanced_accuracy('weighted'), prog_bar=True, on_step=True, on_epoch=True)
 
         return {'y': y, 'scores': scores, 'losses': losses, 'meta': info}
 
@@ -175,6 +180,7 @@ class Classifier(LightningModule):
         self.log('val_precision_macro', self.val_stat_scores.precision('macro'))
         self.log('val_recall_macro', self.val_stat_scores.recall('macro'))
         self.log('val_balanced_acc_macro', self.val_stat_scores.balanced_accuracy('macro'), prog_bar=True)
+        self.log('val_balanced_acc_weighted', self.val_stat_scores.balanced_accuracy('weighted'))
         self.log('val_balanced_acc_micro', self.val_stat_scores.balanced_accuracy('micro'))
         self.log('val_hamming_loss', self.val_stat_scores.hamming_loss())
 

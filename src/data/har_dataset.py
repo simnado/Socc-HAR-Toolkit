@@ -2,7 +2,9 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.datasets.video_utils import VideoClips
 from torchvision.transforms import _transforms_video as v_transforms
+from torchvision import io
 from tqdm.auto import tqdm
+import decord as de
 from src.data import DatabaseHandle, VideoTransformation
 
 
@@ -11,7 +13,7 @@ class HarDataset(Dataset):
                  mean=None, std=None, normalized=True, do_augmentation=False,
                  num_frames=32, fps=15, limit_per_class=1000, clip_offset=None,
                  background_min_distance=3, period_max_distance=10, min_action_overlap=0.99, allow_critical=False,
-                 num_workers=4):
+                 num_workers=4, backend='av'):
         """
         Initializes a dataset
         @param classes: array of classes used. default will use all classes specified in csv
@@ -22,6 +24,9 @@ class HarDataset(Dataset):
         @param num_frames: number of frame to be sampled
         """
         super()
+        de.bridge.set_bridge('torch')
+
+        self.backend = backend
 
         self.background_min_distance = background_min_distance
         self.period_max_distance = period_max_distance  # time border for samples outside a period
@@ -165,12 +170,34 @@ class HarDataset(Dataset):
         return len(self.x)
 
     def get_tensor(self, index, resize=True):
-        clip_idx = self.x[index]
-        try:
-            frames = self.video_clips.get_clip(clip_idx)[0]
-        except IndexError as err:
-            print(f'cannot access video {self.info[index]["key"]} at {self.info[index]["start"]}-{self.info[index]["end"]}. Limit is {self.clips_per_video[self.info[index]["path"]]}')
-            raise err
+        index = self.x[index]
+        #try:
+        #    frames = self.video_clips.get_clip(clip_idx)[0]
+        #except IndexError as err:
+        #    print(f'cannot access video {self.info[index]["key"]} at {self.info[index]["start"]}-{self.info[index]["end"]}. Limit is {self.clips_per_video[self.info[index]["path"]]}')
+        #    raise err
+        video_idx, clip_idx = self.video_clips.get_clip_location(index)
+        video_path = self.video_clips.video_paths[video_idx]
+
+        if self.backend == 'av':
+            clip_pts = self.video_clips.clips[video_idx][clip_idx]
+            start_pts = clip_pts[0].item()
+            end_pts = clip_pts[-1].item()
+            frames, _, _ = io.read_video(video_path, start_pts, end_pts)
+            # todo: maybe faster?
+            # frames, _, _ = io._video_opt._read_video_from_file(video_path, video_width=224, video_height=224, video_pts_range=(start_pts, end_pts), read_audio_stream=False)
+            resampling_idx = self.video_clips.resampling_idxs[video_idx][clip_idx]
+            if isinstance(resampling_idx, torch.Tensor):
+                resampling_idx = resampling_idx - resampling_idx[0]
+            frames = frames[resampling_idx]
+        else:
+            clip_pts = self.video_clips.resampling_idxs[video_idx][clip_idx]
+            vr = de.VideoReader(video_path, num_threads=1) #, ctx=de.gpu())
+            frames = vr.get_batch(clip_pts - clip_pts[0] + clip_idx)
+            vr = None
+            del vr
+
+        # todo: run on gpu
         frames = VideoTransformation(res=self.res if resize else 360, do_augmentation=self.do_augmentation)(frames)
 
         return frames
