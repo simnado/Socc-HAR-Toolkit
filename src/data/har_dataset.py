@@ -189,6 +189,7 @@ class HarDataset(Dataset):
             resampling_idx = self.video_clips.resampling_idxs[video_idx][clip_idx]
             if isinstance(resampling_idx, torch.Tensor):
                 resampling_idx = resampling_idx - resampling_idx[0]
+                resampling_idx = resampling_idx[resampling_idx < len(frames)]
             frames = frames[resampling_idx]
         else:
             clip_pts = self.video_clips.resampling_idxs[video_idx][clip_idx]
