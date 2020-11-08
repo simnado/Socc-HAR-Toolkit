@@ -189,7 +189,8 @@ class HarDataset(Dataset):
             resampling_idx = self.video_clips.resampling_idxs[video_idx][clip_idx]
             if isinstance(resampling_idx, torch.Tensor):
                 resampling_idx = resampling_idx - resampling_idx[0]
-            frames = frames[resampling_idx]
+
+            frames = frames[[re_idx for re_idx in resampling_idx if re_idx < len(frames)]]
         else:
             clip_pts = self.video_clips.resampling_idxs[video_idx][clip_idx]
             vr = de.VideoReader(video_path, num_threads=1) #, ctx=de.gpu())
