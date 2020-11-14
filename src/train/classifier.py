@@ -17,13 +17,13 @@ class Classifier(LightningModule):
     def __init__(self, backbone: Backbone, lr: float, weight_decay: float, epochs: int,
                  scheduler: str, optim: str, batch_size: int, num_classes: int,
                  train_iterations: int, pretrained_path: Path,
-                 num_frames: int, res: int, fps: int,
+                 num_frames: int, res: int, fps: int, consensus='max',
                  trainable_groups=None, accumulate_grad_batches=1, patience=5,
                  **kwargs):
 
         super().__init__()
         self.save_hyperparameters('lr', 'weight_decay', 'epochs', 'scheduler', 'optim', 'batch_size',
-                                  'num_frames', 'res', 'fps',
+                                  'num_frames', 'res', 'fps', 'consensus',
                                   'patience', 'accumulate_grad_batches', 'trainable_groups',
                                   'pretrained_path')
         self.backbone = backbone
@@ -46,10 +46,23 @@ class Classifier(LightningModule):
         self.val_stat_scores = MultiLabelStatScores(self.num_classes, threshold=0.5)
 
     def forward(self, x):
-        # batch_size, channels, frames, width, height = x.size()
+        batch_size, num_chunks, frames, width, height, channels = x.size()
         # todo: data layer
         # todo: transforms
-        return self.backbone(x)
+
+        # reshape chunks to extra samples (6D -> 5D)
+        x = x.reshape((-1,) + x.shape[2:])
+
+        out = self.backbone(x)
+
+        # reshape back to one score per sample
+        out = out.view(batch_size // num_chunks, num_chunks, -1)
+        if self.hparams.consensus == 'avg':
+            out = out.mean(dim=1)
+        elif self.hparams.consensus == 'max':
+            out = out.max(dim=1).values
+
+        return out
 
     def configure_optimizers(self):
 
@@ -100,13 +113,12 @@ class Classifier(LightningModule):
             }
         elif self.hparams.scheduler == 'cycle':
             lr_scheduler = OneCycleLR(optimizer, max_lr=max_lrs, div_factor=10, total_steps=total_steps,
-                                      pct_start=0.25)
+                                      pct_start=0.25, verbose=True)
             lr_scheduler = {
                 'scheduler': lr_scheduler,
                 'interval': 'step',
                 'frequency': 1,
                 'reduce_on_plateau': False,
-                'monitor': 'val_loss'
             }
         else:
             raise Exception('no scheduler set')
@@ -136,8 +148,10 @@ class Classifier(LightningModule):
 
         self.train_stat_scores(scores, y)
 
-        self.log('train_loss', batch_loss, prog_bar=True, on_step=True, on_epoch=True)
-        self.log('batch_acc', self.train_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
+        self.log('train_batch_loss', batch_loss, prog_bar=True)
+        self.log('train_batch_acc_micro', self.train_stat_scores.accuracy('micro'), prog_bar=True)
+        self.log('train_batch_balanced_acc_micro', self.train_stat_scores.balanced_accuracy('micro'), prog_bar=True)
+        self.log('train_batch_balanced_acc_weighted', self.train_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
 
         return {'y': y, 'scores': scores, 'losses': losses, 'meta': info, 'loss': batch_loss}
 
@@ -170,8 +184,10 @@ class Classifier(LightningModule):
 
         self.val_stat_scores(scores, y)
 
-        self.log('val_loss', batch_loss, prog_bar=True, on_step=True)
-        self.log('val_acc', self.val_stat_scores.balanced_accuracy('weighted'), prog_bar=True, on_step=True, on_epoch=True)
+        self.log('val_batch_loss', batch_loss, prog_bar=True)
+        self.log('val_batch_acc_micro', self.val_stat_scores.accuracy('micro'))
+        self.log('val_batch_balanced_acc_micro', self.val_stat_scores.balanced_accuracy('micro'))
+        self.log('val_batch_balanced_acc_weighted', self.val_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
 
         return {'y': y, 'scores': scores, 'losses': losses, 'meta': info}
 

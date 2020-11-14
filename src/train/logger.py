@@ -1,6 +1,7 @@
 import torch
 from pytorch_lightning.loggers import CometLogger
 
+# todo: only works with private git
 COMET_API_TOKEN = "lL8eJl4CI5wlfif6CuU3WS4FE"
 
 

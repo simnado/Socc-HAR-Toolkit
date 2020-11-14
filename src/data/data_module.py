@@ -10,7 +10,8 @@ from src.util.fetch import DatabaseFetcher
 
 class DataModule(LightningDataModule):
 
-    def __init__(self, database: str, data_dir: str, num_frames: int, res: int, fps: int, metadata_path: Optional[str],
+    def __init__(self, database: str, data_dir: str, num_frames: int, res: int, fps: int, consensus: str,
+                 metadata_path: Optional[str],
                  batch_size=32, mean=None, std=None,
                  classes=None, max_train_samples_per_class=500,
                  num_data_workers=None, seed=2147483647):
@@ -30,6 +31,10 @@ class DataModule(LightningDataModule):
         self.num_frames = num_frames
         self.res = res
         self.fps = fps
+        self.consensus = consensus
+
+        assert consensus in ['avg', 'max']
+
         self.mean = mean
         self.std = std
         self.classes = classes
@@ -70,9 +75,10 @@ class DataModule(LightningDataModule):
             self.datasets['train'] = HarDataset(database=self.database,
                                                 video_metadata=self.video_metadata['train'],
                                                 res=self.res, classes=self.classes,
-                                                normalized=True, do_augmentation=True,
+                                                normalized=True, mean=self.mean, std=self.std,
+                                                do_augmentation=True,
                                                 num_frames=self.num_frames, fps=self.fps, clip_offset=self.fps,
-                                                mean=self.mean, std=self.std,
+                                                num_chunks=1,
                                                 num_workers=0)
             self.stats['train'] = DataStats('train', self.datasets['train'], self.limit_per_class['train'], seed=self.seed)
 
@@ -83,9 +89,10 @@ class DataModule(LightningDataModule):
             self.datasets['val'] = HarDataset(database=self.database,
                                               video_metadata=self.video_metadata['val'],
                                               res=self.res, classes=self.classes,
-                                              normalized=True, do_augmentation=False,
+                                              normalized=True, mean=self.mean, std=self.std,
+                                              do_augmentation=False,
                                               num_frames=self.num_frames, fps=self.fps, clip_offset=self.num_frames,
-                                              mean=self.mean, std=self.std,
+                                              num_chunks=1,
                                               num_workers=0)
             self.stats['val'] = DataStats('val', self.datasets['val'], self.limit_per_class['val'], seed=self.seed)
 
@@ -94,9 +101,12 @@ class DataModule(LightningDataModule):
             self.datasets['test'] = HarDataset(database=self.database,
                                                video_metadata=self.video_metadata['test'],
                                                res=self.res, classes=self.classes,
-                                               normalized=True, do_augmentation=False,
-                                               num_frames=200, fps=25, clip_offset=200,
-                                               mean=self.mean, std=self.std, allow_critical=True,
+                                               normalized=True, mean=self.mean, std=self.std,
+                                               do_augmentation=False,
+                                               # 10 sec clips, no overlap
+                                               num_frames=self.num_frames, fps=self.fps, clip_offset=self.fps * 10,
+                                               num_chunks=5, num_frames_per_sample=self.fps * 10,
+                                               allow_critical=True,
                                                num_workers=0)
             self.stats['test'] = DataStats('test', self.datasets['test'], self.limit_per_class['test'], seed=self.seed)
 

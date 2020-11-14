@@ -16,6 +16,7 @@ class VideoTransformation(object):
 
         num_frames = frames.shape[0]  # t x c x h x w
 
+        # todo: use gpu-batch-transformations -> classifier
         width = frames.shape[2]
         height = frames.shape[1]
         left = random.randint(0, math.floor(0.1 * width))

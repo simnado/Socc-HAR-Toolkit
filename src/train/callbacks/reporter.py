@@ -50,6 +50,7 @@ class Reporter(Callback):
         self.train_stat_curves(self.train_data['scores'], self.train_data['y'])
         pl_module.log('train_auroc_micro', self.train_stat_curves.auroc('micro'))
         pl_module.log('train_auroc_macro', self.train_stat_curves.auroc('macro'))
+        pl_module.log('train_loss', self.train_data['losses'].mean())
 
         self._save_worst_samples('train', self.train_data, trainer.current_epoch)
 
@@ -73,6 +74,7 @@ class Reporter(Callback):
         self.val_stat_curves(self.val_data['scores'], self.val_data['y'])
         pl_module.log('val_auroc_micro', self.val_stat_curves.auroc('micro'))
         pl_module.log('val_auroc_macro', self.val_stat_curves.auroc('macro'))
+        pl_module.log('val_loss', self.val_data['losses'].mean())
 
         self._save_worst_samples('test', self.test_data, trainer.current_epoch)
 

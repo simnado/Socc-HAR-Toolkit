@@ -1,17 +1,18 @@
 import torch
 from torch.utils.data import Dataset
 from torchvision.datasets.video_utils import VideoClips
-from torchvision.transforms import _transforms_video as v_transforms
+from torchvision.transforms import Normalize
 from torchvision import io
 from tqdm.auto import tqdm
 import decord as de
+import numpy as np
 from src.data import DatabaseHandle, VideoTransformation
 
 
 class HarDataset(Dataset):
     def __init__(self, database: DatabaseHandle, res: int, classes: [str], video_metadata: dict,
                  mean=None, std=None, normalized=True, do_augmentation=False,
-                 num_frames=32, fps=15, limit_per_class=1000, clip_offset=None,
+                 num_frames=32, num_frames_per_sample=None, num_chunks=1, fps=15, limit_per_class=1000, clip_offset=None,
                  background_min_distance=3, period_max_distance=10, min_action_overlap=0.99, allow_critical=False,
                  num_workers=4, backend='av'):
         """
@@ -37,10 +38,14 @@ class HarDataset(Dataset):
         self.normalized = normalized
         self.do_augmentation = do_augmentation
         self.num_frames = num_frames
+        self.num_frames_per_sample = num_frames_per_sample
+        if num_frames_per_sample is None:
+            self.num_frames_per_sample = num_frames
+        self.num_chunks = num_chunks
         self.res = res
         self._limit_per_class = limit_per_class
         self.fps = fps
-        self.duration = self.num_frames / self.fps
+        self.duration = self.num_frames_per_sample / self.fps
         self.clip_offset = clip_offset
         if clip_offset is None:
             self.clip_offset = fps  # samples a clip with any second
@@ -48,6 +53,8 @@ class HarDataset(Dataset):
         self.video_metadata = video_metadata
         self.mean = mean
         self.std = std
+        self.normalize = Normalize(self.mean, self.std)
+
         self.num_workers = num_workers
         self._id_2_index = dict()
 
@@ -157,9 +164,11 @@ class HarDataset(Dataset):
     def __getitem__(self, index):
         x = self.get_tensor(index)
 
-        # todo: move to data loader??
+        # todo: run on gpu -> move to classifier
         if self.normalized:
-            x = v_transforms.NormalizeVideo(mean=self.mean, std=self.std)(x)
+            for chunk in range(self.num_chunks):
+                # transform (C x T x S^2) to (T x C x S^2)
+                x[chunk] = self.normalize(x[chunk].permute(1, 0, 2, 3)).permute(1, 0, 2, 3)
 
         y = self.y[index]
         info = self.info[index]
@@ -171,11 +180,7 @@ class HarDataset(Dataset):
 
     def get_tensor(self, index, resize=True):
         index = self.x[index]
-        #try:
-        #    frames = self.video_clips.get_clip(clip_idx)[0]
-        #except IndexError as err:
-        #    print(f'cannot access video {self.info[index]["key"]} at {self.info[index]["start"]}-{self.info[index]["end"]}. Limit is {self.clips_per_video[self.info[index]["path"]]}')
-        #    raise err
+
         video_idx, clip_idx = self.video_clips.get_clip_location(index)
         video_path = self.video_clips.video_paths[video_idx]
 
@@ -201,7 +206,24 @@ class HarDataset(Dataset):
         # todo: run on gpu
         frames = VideoTransformation(res=self.res if resize else 360, do_augmentation=self.do_augmentation)(frames)
 
+        # reshape if test loop from 4D to 5D (Chunks x Frames x H x W x C)
+        frames = self._get_chunks(frames)
+
         return frames
+
+    def _get_chunks(self, x):
+        """see mmaction2 (SampleFrames)
+        """
+        x_len = x.shape[0]
+        if self.num_chunks == 1:
+            return torch.unsqueeze(x, 0)
+        avg_interval = (x_len - self.num_frames + 1) / float(self.num_chunks - 1)
+        if self.num_frames < x_len - 1:
+            clip_offsets = (np.arange(self.num_chunks) * avg_interval).astype(np.int)
+        else:
+            print('cannot sample segments')
+            clip_offsets = np.zeros((self.num_chunks, ), dtype=np.int)
+        return torch.stack([x[start:start + self.num_frames] for start in clip_offsets])
 
     def precompute_mean_and_std(self):
         mean_channel_1 = []
@@ -218,7 +240,7 @@ class HarDataset(Dataset):
 
         # segmentation: distance between clips is one second. clips will probably overlap
         clips = VideoClips(self.video_paths,
-                           clip_length_in_frames=self.num_frames,
+                           clip_length_in_frames=self.num_frames_per_sample,
                            frames_between_clips=self.clip_offset,
                            frame_rate=self.fps,
                            num_workers=self.num_workers,
