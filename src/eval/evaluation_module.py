@@ -11,10 +11,9 @@ from src.eval import OutDir, ClipPlot, PlotIterator
 
 class EvaluationModule:
 
-    def __init__(self, out_dir: str, data_module: DataModule, img_format='eps'):
+    def __init__(self, out_dir: str, data_module: DataModule, logger, img_format='eps'):
         self.dm = data_module
-        # todo: self.logger = logger
-        self.logger = None
+        self.logger = logger
         self.out_dir = OutDir(out_dir)
 
         assert img_format in ['svg', 'eps', 'png']
@@ -58,16 +57,16 @@ class EvaluationModule:
         if context != 'all':
             actions = self.dm.stats[context].actions
             samples = self.dm.stats[context].samples
-            resamples = self.dm.stats[context].resamples
+            resamples = self.dm.stats[context].resamples.tolist() + [self.dm.stats[context].background_samples]
         else:
             actions = torch.sum(torch.tensor([self.dm.stats[context].actions for context in ['train', 'val', 'test']]), dim=0)
             samples = torch.sum(torch.tensor([self.dm.stats[context].samples for context in ['train', 'val', 'test']]), dim=0)
-            resamples = torch.sum(torch.stack([self.dm.stats[context].resamples for context in ['train', 'val', 'test']]), dim=0)
+            resamples = torch.sum(torch.stack([self.dm.stats[context].resamples + [self.dm.stats[context].background_samples] for context in ['train', 'val', 'test']]), dim=0)
 
         plt.xticks(rotation=45, ha="right")
         ax.bar(self.dm.classes, samples, label='samples')
         if context in ['train', 'val', 'test'] and show == 'used_samples':
-            ax.bar(self.dm.classes, resamples, label='used samples')
+            ax.bar(self.dm.classes + ['background'], resamples, label='used samples')
         if show == 'annotations':
             ax.bar(self.dm.classes, actions, label='annotations')
         if context != 'all':
@@ -118,6 +117,7 @@ class EvaluationModule:
             print(f'context set to {context}')
 
         dataset = self.dm.datasets[context]
+        indices = self.dm.stats[context].indices
 
         if row is None and video is not None and offset is not None:
             print('searching..')
@@ -128,7 +128,7 @@ class EvaluationModule:
                     break
 
         if row is None:
-            row = random.randint(0, len(dataset) - 1)
+            row = indices[random.randint(0, len(indices) - 1)]
             print(f'row set to {row} by random choice')
 
         if row is not None:
@@ -150,7 +150,7 @@ class EvaluationModule:
             assert indices and len(pred) == len(indices), 'length of `pred` has to match length of `indices`'
 
         if not indices:
-            indices = [i for i in range(num_samples)]
+            indices = stats.indices
 
         if label:
             label_idx = dataset.classes.index(label)

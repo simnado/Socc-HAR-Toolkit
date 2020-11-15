@@ -60,8 +60,8 @@ class Classifier(LightningModule):
         print(x.shape)
 
         # transforms
-        for batch in range(self.hparams.batch_size):
-            for chunk in range(self.num_chunks):
+        for batch in range(batch_size):
+            for chunk in range(num_chunks):
                 # transform (C x T x S^2) to (T x C x S^2)
                 x[batch][chunk] = self.normalize(x[batch][chunk].permute(1, 0, 2, 3)).permute(1, 0, 2, 3)
 
@@ -141,14 +141,6 @@ class Classifier(LightningModule):
             raise Exception('no scheduler set')
 
         return [optimizer], [lr_scheduler]
-
-    def on_train_start(self) -> None:
-        super().on_train_start()
-        train_params, total_params = self.count_parameters()
-        self.logger.experiment.log_other('total_parameters', total_params)
-        self.logger.experiment.log_other('trainable_parameters', train_params)
-        self.logger.experiment.log_text(text=str(self.summarize()), metadata={'type': 'summary'})
-        self.logger.log_hyperparams(self.hparams)
 
     def training_step(self, batch, batch_idx):
         if batch_idx == 0:
@@ -304,7 +296,7 @@ class Classifier(LightningModule):
 
     @property
     def train_iterations(self):
-        return self.train_samples // self.hparams.batch_size
+        return math.ceil(self.train_samples / self.hparams.batch_size)
 
     def load_weights(self):
         if self.hparams.pretrained_path and self.hparams.pretrained_path.exists():

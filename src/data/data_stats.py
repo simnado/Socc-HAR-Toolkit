@@ -15,6 +15,7 @@ class DataStats:
         self.resamples = [0 for _ in self.dataset.classes]
         self.ratios = [0 for _ in self.dataset.classes]
         self.background_samples = 0
+        self.background_resamples = 0
         self.overlap_samples = 0
         self.background_ratio = 0
         self.weights = None
@@ -59,6 +60,7 @@ class DataStats:
 
         y = self.dataset.y[self.indices]
         self.resamples = torch.sum(y, dim=0)
+        self.background_resamples = torch.sum(torch.sum(y, dim=1) == 0).item()
 
         # iterate pairwise
         self.pairwise_occs = torch.zeros([num_classes, num_classes])

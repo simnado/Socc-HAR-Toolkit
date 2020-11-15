@@ -43,15 +43,15 @@ class ClipPlot:
 
     def save(self, format: str):
         filename = self.save_dir.joinpath(f'{self.filename}.{format}')
-        if format == 'svg':
-            self.grid_plot.savefig(filename, format='svg')
+        if format == 'svg' or format == 'eps':
+            self.grid_plot.savefig(filename, format=format)
         elif format == 'mp4':
             self.clip_plot.save(filename,
                                 writer=FFMpegWriter(fps=12, metadata=dict(artist='SoccHAR-32'), bitrate=1800))
         elif format == 'gif':
             self.clip_plot.save(filename, writer=PillowWriter(fps=12))
 
-        if logger:
+        if self.logger:
             with self.logger.experiment.context_manager("val"):
                 self.logger.experiment.log_asset(filename,
                                                  metadata={'split': self.info['context'], 'id': self.filename,
@@ -155,5 +155,5 @@ class ClipPlot:
 
     def _get_x(self, resize=True):
         x = self.dataset.get_tensor(self.row, resize)
-        return x.permute((1, 2, 3, 0))  # (T, H, W, C)
+        return x[0].permute((1, 2, 3, 0))  # (T, H, W, C)
 

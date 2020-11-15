@@ -41,6 +41,8 @@ class DataModule(LightningDataModule):
         self.stats = dict()
         self.limit_per_class = dict(train=self.max_train_samples_per_class, val=50, test=100)
 
+        self.num_train_samples = None
+
         self.test_loc_dataset = None
 
         self.num_data_workers = num_data_workers
@@ -75,6 +77,8 @@ class DataModule(LightningDataModule):
                                                 num_chunks=1,
                                                 num_workers=0)
             self.stats['train'] = DataStats('train', self.datasets['train'], self.limit_per_class['train'], seed=self.seed)
+            limit = self.limit_per_class['train']
+            self.num_train_samples = sum([limit] + [min(limit, self.stats['train'].samples[cls_idx]) for cls_idx, _ in enumerate(self.classes)])
 
             # allowing no augmentation, no overlap, no critical
             self.datasets['val'] = HarDataset(database=self.database,
@@ -102,13 +106,10 @@ class DataModule(LightningDataModule):
     def train_dataloader(self):
         assert "train" in self.datasets, "No TrainingSet build, run setup('fit')"
 
-        limit = self.limit_per_class['train']
-        dataset = self.datasets["train"]
-        stats = self.stats['train']
-        num_samples = sum([limit] + [min(limit, stats.samples[cls_idx]) for cls_idx, _ in enumerate(self.classes)])
-        print(f'sample {num_samples}/{len(dataset)} random clips')
-        sampler = WeightedRandomSampler(stats.weights, int(num_samples))  # should be different each iteration
-        dl = DataLoader(dataset, batch_size=self.batch_size, sampler=sampler,
+        print(f'sample {self.num_train_samples}/{len(self.datasets["train"])} random clips')
+        # should be different each iteration
+        sampler = WeightedRandomSampler(self.stats['train'].weights, int(self.num_train_samples))
+        dl = DataLoader(self.datasets["train"], batch_size=self.batch_size, sampler=sampler,
                         num_workers=self.num_data_workers, collate_fn=self.collate)
         return dl
 
