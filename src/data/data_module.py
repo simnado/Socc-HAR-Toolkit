@@ -12,7 +12,7 @@ class DataModule(LightningDataModule):
 
     def __init__(self, database: str, data_dir: str, num_frames: int, res: int, fps: int, consensus: str,
                  metadata_path: Optional[str],
-                 batch_size=32, mean=None, std=None,
+                 batch_size=32,
                  classes=None, max_train_samples_per_class=500,
                  num_data_workers=None, seed=2147483647):
         super().__init__()
@@ -35,8 +35,6 @@ class DataModule(LightningDataModule):
 
         assert consensus in ['avg', 'max']
 
-        self.mean = mean
-        self.std = std
         self.classes = classes
 
         if self.classes is None:
@@ -75,21 +73,16 @@ class DataModule(LightningDataModule):
             self.datasets['train'] = HarDataset(database=self.database,
                                                 video_metadata=self.video_metadata['train'],
                                                 res=self.res, classes=self.classes,
-                                                normalized=True, mean=self.mean, std=self.std,
                                                 do_augmentation=True,
                                                 num_frames=self.num_frames, fps=self.fps, clip_offset=self.fps,
                                                 num_chunks=1,
                                                 num_workers=0)
             self.stats['train'] = DataStats('train', self.datasets['train'], self.limit_per_class['train'], seed=self.seed)
 
-            self.mean = self.datasets['train'].mean
-            self.std = self.datasets['train'].std
-
             # allowing no augmentation, no overlap, no critical
             self.datasets['val'] = HarDataset(database=self.database,
                                               video_metadata=self.video_metadata['val'],
                                               res=self.res, classes=self.classes,
-                                              normalized=True, mean=self.mean, std=self.std,
                                               do_augmentation=False,
                                               num_frames=self.num_frames, fps=self.fps, clip_offset=self.num_frames,
                                               num_chunks=1,
@@ -101,7 +94,6 @@ class DataModule(LightningDataModule):
             self.datasets['test'] = HarDataset(database=self.database,
                                                video_metadata=self.video_metadata['test'],
                                                res=self.res, classes=self.classes,
-                                               normalized=True, mean=self.mean, std=self.std,
                                                do_augmentation=False,
                                                # 10 sec clips, no overlap
                                                num_frames=self.num_frames, fps=self.fps, clip_offset=self.fps * 10,

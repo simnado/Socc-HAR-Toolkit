@@ -10,12 +10,14 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau, OneCycleLR
 from pytorch_lightning.core.lightning import LightningModule
 from src.arch.backbone import Backbone
 from src.eval.metrics import MultiLabelStatScores
+from torchvision.transforms import Normalize
 
 
 class Classifier(LightningModule):
 
     def __init__(self, backbone: Backbone, lr: float, weight_decay: float, epochs: int,
                  scheduler: str, optim: str, batch_size: int, num_classes: int,
+                 mean: [float], std: [float],
                  train_iterations: int, pretrained_path: Path,
                  num_frames: int, res: int, fps: int, consensus='max',
                  trainable_groups=None, accumulate_grad_batches=1, patience=5,
@@ -25,7 +27,7 @@ class Classifier(LightningModule):
         self.save_hyperparameters('lr', 'weight_decay', 'epochs', 'scheduler', 'optim', 'batch_size',
                                   'num_frames', 'res', 'fps', 'consensus',
                                   'patience', 'accumulate_grad_batches', 'trainable_groups',
-                                  'pretrained_path')
+                                  'pretrained_path', 'mean', 'std')
         self.backbone = backbone
         self.hparams.name = self.backbone.__class__.__name__
 
@@ -34,6 +36,10 @@ class Classifier(LightningModule):
             self.id = f'{self.id}_pretrainedOn{pretrained_path.name}'
 
         self.num_classes = num_classes
+
+        self.mean = mean
+        self.std = std
+        self.normalize = Normalize(self.mean, self.std)
 
         self.reportLoss = BCEWithLogitsLoss(reduction='none')
         self.loss = BCEWithLogitsLoss(reduction='mean')
@@ -48,7 +54,14 @@ class Classifier(LightningModule):
     def forward(self, x):
         batch_size, num_chunks, frames, width, height, channels = x.size()
         # todo: data layer
-        # todo: transforms
+
+        print(x.shape)
+
+        # transforms
+        for batch in range(self.hparams.batch_size):
+            for chunk in range(self.num_chunks):
+                # transform (C x T x S^2) to (T x C x S^2)
+                x[batch][chunk] = self.normalize(x[batch][chunk].permute(1, 0, 2, 3)).permute(1, 0, 2, 3)
 
         # reshape chunks to extra samples (6D -> 5D)
         x = x.reshape((-1,) + x.shape[2:])
@@ -148,6 +161,7 @@ class Classifier(LightningModule):
 
         self.train_stat_scores(scores, y)
 
+        self.log('train_max_score', scores.max())
         self.log('train_batch_loss', batch_loss, prog_bar=True)
         self.log('train_batch_acc_micro', self.train_stat_scores.accuracy('micro'), prog_bar=True)
         self.log('train_batch_balanced_acc_micro', self.train_stat_scores.balanced_accuracy('micro'), prog_bar=True)
@@ -184,6 +198,7 @@ class Classifier(LightningModule):
 
         self.val_stat_scores(scores, y)
 
+        self.log('val_max_score', scores.max())
         self.log('val_batch_loss', batch_loss, prog_bar=True)
         self.log('val_batch_acc_micro', self.val_stat_scores.accuracy('micro'))
         self.log('val_batch_balanced_acc_micro', self.val_stat_scores.balanced_accuracy('micro'))

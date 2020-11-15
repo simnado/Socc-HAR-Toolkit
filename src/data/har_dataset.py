@@ -1,7 +1,6 @@
 import torch
 from torch.utils.data import Dataset
 from torchvision.datasets.video_utils import VideoClips
-from torchvision.transforms import Normalize
 from torchvision import io
 from tqdm.auto import tqdm
 import decord as de
@@ -11,7 +10,7 @@ from src.data import DatabaseHandle, VideoTransformation
 
 class HarDataset(Dataset):
     def __init__(self, database: DatabaseHandle, res: int, classes: [str], video_metadata: dict,
-                 mean=None, std=None, normalized=True, do_augmentation=False,
+                 do_augmentation=False,
                  num_frames=32, num_frames_per_sample=None, num_chunks=1, fps=15, limit_per_class=1000, clip_offset=None,
                  background_min_distance=3, period_max_distance=10, min_action_overlap=0.99, allow_critical=False,
                  num_workers=4, backend='av'):
@@ -19,9 +18,6 @@ class HarDataset(Dataset):
         Initializes a dataset
         @param classes: array of classes used. default will use all classes specified in csv
         @param res: spatial base resolution
-        @param mean:
-        @param std:
-        @param normalized:
         @param num_frames: number of frame to be sampled
         """
         super()
@@ -35,7 +31,6 @@ class HarDataset(Dataset):
         self.allow_critical = allow_critical
 
         self.classes = classes
-        self.normalized = normalized
         self.do_augmentation = do_augmentation
         self.num_frames = num_frames
         self.num_frames_per_sample = num_frames_per_sample
@@ -51,9 +46,6 @@ class HarDataset(Dataset):
             self.clip_offset = fps  # samples a clip with any second
         self.database = database
         self.video_metadata = video_metadata
-        self.mean = mean
-        self.std = std
-        self.normalize = Normalize(self.mean, self.std)
 
         self.num_workers = num_workers
         self._id_2_index = dict()
@@ -71,13 +63,6 @@ class HarDataset(Dataset):
 
         # set samples and calc stats
         self.get_samples()
-
-        # precompute means and stds
-        if self.normalized and (self.mean is None or self.std is None):
-            self.normalized = False
-            self.mean, self.std = self.precompute_mean_and_std()
-            print(f'mean={self.mean}, std={self.std}')
-            self.normalized = True
 
     def get_samples(self):
         y = []
@@ -163,12 +148,6 @@ class HarDataset(Dataset):
 
     def __getitem__(self, index):
         x = self.get_tensor(index)
-
-        # todo: run on gpu -> move to classifier
-        if self.normalized:
-            for chunk in range(self.num_chunks):
-                # transform (C x T x S^2) to (T x C x S^2)
-                x[chunk] = self.normalize(x[chunk].permute(1, 0, 2, 3)).permute(1, 0, 2, 3)
 
         y = self.y[index]
         info = self.info[index]
