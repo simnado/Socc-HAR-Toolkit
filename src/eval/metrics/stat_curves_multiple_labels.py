@@ -2,6 +2,7 @@ from typing import Optional, Any
 import torch
 from pytorch_lightning.metrics.metric import Metric
 from pytorch_lightning.metrics.functional.reduction import class_reduce
+from pytorch_lightning.metrics import Accuracy
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score, roc_curve, auc
 import numpy as np
 
@@ -50,14 +51,15 @@ class MultiLabelStatCurves(Metric):
     def threshold_finder_scalar(self, class_reduction='macro'):
         xs = torch.linspace(0.05, 0.95, 29)
 
-        metric = balanced_accuracy_score
+        metric = Accuracy
 
         if class_reduction == 'micro':
             return [metric(torch.reshape(self.target, (-1,)), torch.reshape(self.scores, -1), threshold=i) for i in xs]
 
-        class_curves = torch.Tensor((32, len(xs)))
+        class_curves = torch.zeros((32, len(xs)))
         for cls in range(self.num_classes):
-            class_curves[cls] = [metric(self.target[:, cls], self.scores[:, cls], threshold=i) for i in xs]
+            shit = torch.stack([metric(threshold=i)(self.target[:, cls], self.scores[:, cls]) for i in xs])
+            class_curves[cls] = torch.stack([metric(threshold=i)(self.target[:, cls], self.scores[:, cls]) for i in xs])
 
         if class_reduction == 'macro':
             return xs, class_curves.mean(dim=1)

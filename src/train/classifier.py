@@ -9,7 +9,7 @@ from torch.nn import BCEWithLogitsLoss
 from torch.optim.lr_scheduler import ReduceLROnPlateau, OneCycleLR
 from pytorch_lightning.core.lightning import LightningModule
 from src.arch.backbone import Backbone
-from src.eval.metrics import MultiLabelStatScores
+from src.eval import MultiLabelStatCurves, MultiLabelStatScores
 from torchvision.transforms import Normalize
 
 
@@ -52,6 +52,11 @@ class Classifier(LightningModule):
         # metrics
         self.train_stat_scores = MultiLabelStatScores(self.num_classes, threshold=0.5)
         self.val_stat_scores = MultiLabelStatScores(self.num_classes, threshold=0.5)
+        self.test_stat_scores = MultiLabelStatScores(self.num_classes, threshold=0.5)
+
+        self.train_stat_curves = MultiLabelStatCurves(len(self.classes))
+        self.val_stat_curves = MultiLabelStatCurves(len(self.classes))
+        self.test_stat_curves = MultiLabelStatCurves(len(self.classes))
 
     def forward(self, x):
         batch_size, num_chunks, frames, width, height, channels = x.size()
@@ -146,6 +151,7 @@ class Classifier(LightningModule):
         if batch_idx == 0:
             self.epoch_start = time.time()
             self.train_stat_scores.reset()
+            self.train_stat_curves.reset()
 
         x, y, info = batch
         out = self(x)
@@ -156,6 +162,7 @@ class Classifier(LightningModule):
         scores = torch.sigmoid(out)
 
         self.train_stat_scores(scores, y)
+        self.train_stat_curves(scores, y)
 
         self.log('train_max_score', scores.max())
         self.log('train_batch_loss', batch_loss, prog_bar=True)
@@ -163,9 +170,10 @@ class Classifier(LightningModule):
         self.log('train_batch_balanced_acc_micro', self.train_stat_scores.balanced_accuracy('micro'), prog_bar=True)
         self.log('train_batch_balanced_acc_weighted', self.train_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
 
-        return {'y': y, 'scores': scores, 'losses': losses, 'meta': info, 'loss': batch_loss}
+        return {'losses': losses, 'meta': info, 'loss': batch_loss}
 
     def training_epoch_end(self, outputs):
+        outputs = outputs[0][0]['extra']
 
         train_time = time.time() - self.epoch_start
 
@@ -177,12 +185,18 @@ class Classifier(LightningModule):
         self.log('train_hamming_loss', self.train_stat_scores.hamming_loss())
         self.log('train_time', train_time, on_epoch=True)
 
+        self.log('train_loss', outputs['losses'].mean())
+
+        self.log('train_auroc_micro', self.train_stat_curves.auroc('micro'))
+        self.log('train_auroc_macro', self.train_stat_curves.auroc('macro'))
+
     # Validation stuff from here
 
     def validation_step(self, batch, batch_idx):
 
         if batch_idx == 0:
             self.val_stat_scores.reset()
+            self.val_stat_curves.reset()
 
         x, y, info = batch
         out = self(x)
@@ -193,6 +207,7 @@ class Classifier(LightningModule):
         scores = torch.sigmoid(out)
 
         self.val_stat_scores(scores, y)
+        self.val_stat_curves(scores, y)
 
         self.log('val_max_score', scores.max())
         self.log('val_batch_loss', batch_loss, prog_bar=True)
@@ -200,7 +215,7 @@ class Classifier(LightningModule):
         self.log('val_batch_balanced_acc_micro', self.val_stat_scores.balanced_accuracy('micro'))
         self.log('val_batch_balanced_acc_weighted', self.val_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
 
-        return {'y': y, 'scores': scores, 'losses': losses, 'meta': info}
+        return {'losses': losses, 'meta': info}
 
     def validation_epoch_end(self, outputs):
 
@@ -211,9 +226,18 @@ class Classifier(LightningModule):
         self.log('val_balanced_acc_micro', self.val_stat_scores.balanced_accuracy('micro'))
         self.log('val_hamming_loss', self.val_stat_scores.hamming_loss())
 
+        self.log('val_loss', outputs['losses'].mean())
+
+        self.log('val_auroc_micro', self.val_stat_curves.auroc('micro'))
+        self.log('val_auroc_macro', self.val_stat_curves.auroc('macro'))
+
     # Test stuff from here
 
     def test_step(self, batch, batch_idx):
+
+        if batch_idx == 0:
+            self.test_stat_scores.reset()
+            self.test_stat_curves.reset()
 
         x, y, info = batch
         out = self(x)
@@ -223,30 +247,20 @@ class Classifier(LightningModule):
         batch_loss = losses.mean()
         scores = torch.sigmoid(out)
 
-        self.log('test_loss', batch_loss, prog_bar=True, logger=True, on_epoch=True, on_step=True)
+        self.test_stat_scores(scores, y)
+        self.test_stat_curves(scores, y)
 
-        return {'y': y, 'scores': scores, 'losses': losses, 'ids': np.array(info['id'])}
+        self.log('test_max_score', scores.max())
+        self.log('test_batch_loss', batch_loss, prog_bar=True)
+        self.log('test_batch_acc_micro', self.test_stat_scores.accuracy('micro'))
+        self.log('test_batch_balanced_acc_micro', self.test_stat_scores.balanced_accuracy('micro'))
+        self.log('test_batch_balanced_acc_weighted', self.test_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
+
+        return {'losses': losses, 'meta': info}
 
     def test_epoch_end(self, outputs):
 
-        # prevent half precision metric bugs
-        # y = torch.FloatTensor(y.to(torch.float32).tolist())
-        # pred = torch.FloatTensor(pred.to(torch.float32).tolist())
-
-        #acc = 1 - hamming(y, pred)
-        #micro_auc, macro_auc = 0, 0
-
-        #try:
-        #    micro_auc, macro_auc, _ = roc_auc(y, pred)
-
-        #except ValueError as err:
-        #    print('cannot calculate roc: ')
-        #    print(err)
-
-        #self.log('val_acc', acc, prog_bar=True)
-        #self.log('test_macro_auc', macro_auc)
-        #self.log('test_micro_auc', micro_auc)
-        pass
+        self.log('test_loss', outputs['losses'].mean())
 
     def count_parameters(self):
         trainable_parameters = 0

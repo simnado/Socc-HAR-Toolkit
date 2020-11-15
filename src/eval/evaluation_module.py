@@ -57,11 +57,11 @@ class EvaluationModule:
         if context != 'all':
             actions = self.dm.stats[context].actions
             samples = self.dm.stats[context].samples
-            resamples = self.dm.stats[context].resamples.tolist() + [self.dm.stats[context].background_samples]
+            resamples = self.dm.stats[context].resamples.tolist() + [self.dm.stats[context].background_resamples]
         else:
             actions = torch.sum(torch.tensor([self.dm.stats[context].actions for context in ['train', 'val', 'test']]), dim=0)
             samples = torch.sum(torch.tensor([self.dm.stats[context].samples for context in ['train', 'val', 'test']]), dim=0)
-            resamples = torch.sum(torch.stack([self.dm.stats[context].resamples + [self.dm.stats[context].background_samples] for context in ['train', 'val', 'test']]), dim=0)
+            resamples = torch.sum(torch.stack([self.dm.stats[context].resamples + [self.dm.stats[context].background_resamples] for context in ['train', 'val', 'test']]), dim=0)
 
         plt.xticks(rotation=45, ha="right")
         ax.bar(self.dm.classes, samples, label='samples')
