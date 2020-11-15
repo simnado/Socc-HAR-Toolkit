@@ -10,7 +10,7 @@ from src.util.fetch import DatabaseFetcher
 
 class DataModule(LightningDataModule):
 
-    def __init__(self, database: str, data_dir: str, num_frames: int, res: int, fps: int, consensus: str,
+    def __init__(self, database: str, data_dir: str, num_frames: int, res: int, fps: int,
                  metadata_path: Optional[str],
                  batch_size=32,
                  classes=None, max_train_samples_per_class=500,
@@ -31,9 +31,6 @@ class DataModule(LightningDataModule):
         self.num_frames = num_frames
         self.res = res
         self.fps = fps
-        self.consensus = consensus
-
-        assert consensus in ['avg', 'max']
 
         self.classes = classes
 

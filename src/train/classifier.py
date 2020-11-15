@@ -18,15 +18,17 @@ class Classifier(LightningModule):
     def __init__(self, backbone: Backbone, lr: float, weight_decay: float, epochs: int,
                  scheduler: str, optim: str, batch_size: int, num_classes: int,
                  mean: [float], std: [float],
-                 train_iterations: int, pretrained_path: Path,
+                 train_samples: int, pretrained_path: Path,
                  num_frames: int, res: int, fps: int, consensus='max',
-                 trainable_groups=None, accumulate_grad_batches=1, patience=5,
+                 trainable_groups=None, patience=5,
                  **kwargs):
+
+        assert consensus in ['avg', 'max']
 
         super().__init__()
         self.save_hyperparameters('lr', 'weight_decay', 'epochs', 'scheduler', 'optim', 'batch_size',
                                   'num_frames', 'res', 'fps', 'consensus',
-                                  'patience', 'accumulate_grad_batches', 'trainable_groups',
+                                  'patience', 'trainable_groups',
                                   'pretrained_path', 'mean', 'std')
         self.backbone = backbone
         self.hparams.name = self.backbone.__class__.__name__
@@ -44,7 +46,7 @@ class Classifier(LightningModule):
         self.reportLoss = BCEWithLogitsLoss(reduction='none')
         self.loss = BCEWithLogitsLoss(reduction='mean')
 
-        self.train_iterations = train_iterations
+        self.train_samples = train_samples
         self.epoch_start = None
 
         # metrics
@@ -81,6 +83,8 @@ class Classifier(LightningModule):
 
         self.unfreeze_layers(groups=self.hparams.trainable_groups)
 
+        self.hparams.accumulate_grad_batches = self.accumulate_grad_batches
+
         opt_params = []
         max_lrs = []
         for idx, layers in enumerate(self.trainable_layers):
@@ -100,7 +104,6 @@ class Classifier(LightningModule):
         else:
             raise Exception('no optimizer set')
 
-        total_steps = math.ceil(self.hparams.epochs * self.train_iterations / self.hparams.accumulate_grad_batches)
         if self.hparams.scheduler == 'cosine':
             print(f'start cosine annealing with {self.train_iterations} iterations')
             # lr_scheduler = CosineAnnealingLR(optimizer, iterations)
@@ -125,6 +128,7 @@ class Classifier(LightningModule):
                 'monitor': 'val_loss'
             }
         elif self.hparams.scheduler == 'cycle':
+            total_steps = math.ceil(self.hparams.epochs * self.train_iterations / self.accumulate_grad_batches)
             lr_scheduler = OneCycleLR(optimizer, max_lr=max_lrs, div_factor=10, total_steps=total_steps,
                                       pct_start=0.25, verbose=True)
             lr_scheduler = {
@@ -278,6 +282,7 @@ class Classifier(LightningModule):
 
         self.freeze()
 
+        print('unfreezed layers: ')
         for layer in list(itertools.chain(*self.trainable_layers)):
             for name, param in layer.named_parameters():
                 param.requires_grad = True
@@ -292,6 +297,14 @@ class Classifier(LightningModule):
         if type(self.hparams.lr) == float:
             self.hparams.lr = [self.hparams.lr]
         return np.linspace(self.hparams.lr[-1], self.hparams.lr[0], self.hparams.trainable_groups)
+
+    @property
+    def accumulate_grad_batches(self):
+        return 64 // self.hparams.batch_size
+
+    @property
+    def train_iterations(self):
+        return self.train_samples // self.hparams.batch_size
 
     def load_weights(self):
         if self.hparams.pretrained_path and self.hparams.pretrained_path.exists():
