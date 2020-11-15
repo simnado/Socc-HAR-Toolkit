@@ -37,9 +37,9 @@ class MultiLabelStatCurves(Metric):
         assert preds.shape == target.shape
         assert preds.shape[1] == self.num_classes
 
-        self.scores = torch.cat([self.scores, preds.detach().cpu()], dim=0)
-        self.target = torch.cat([self.target, target.detach().cpu()], dim=0)
-        self.sup += (target.detach().cpu() == 1).to(torch.long).sum(dim=0)
+        self.scores = torch.cat([self.scores, preds], dim=0)
+        self.target = torch.cat([self.target, target], dim=0)
+        self.sup += (target == 1).to(torch.long).sum(dim=0)
 
     def compute(self):
         """
@@ -58,7 +58,6 @@ class MultiLabelStatCurves(Metric):
 
         class_curves = torch.zeros((32, len(xs)))
         for cls in range(self.num_classes):
-            shit = torch.stack([metric(threshold=i)(self.target[:, cls], self.scores[:, cls]) for i in xs])
             class_curves[cls] = torch.stack([metric(threshold=i)(self.target[:, cls], self.scores[:, cls]) for i in xs])
 
         if class_reduction == 'macro':
@@ -92,9 +91,9 @@ class MultiLabelStatCurves(Metric):
 
         try:
             if class_reduction is None:
-                return roc_auc_score(self.target, self.scores, average=None)
+                return roc_auc_score(self.target.cpu(), self.scores.cpu(), average=None)
             elif class_reduction in ['micro', 'macro']:
-                return roc_auc_score(self.target, self.scores, average=class_reduction)
+                return roc_auc_score(self.target.cpu(), self.scores.cpu(), average=class_reduction)
         except ValueError as e:
             print('cannot compute roc: not all classes present')
             print(e)

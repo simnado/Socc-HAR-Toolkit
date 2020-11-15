@@ -54,15 +54,20 @@ class Classifier(LightningModule):
         self.val_stat_scores = MultiLabelStatScores(self.num_classes, threshold=0.5)
         self.test_stat_scores = MultiLabelStatScores(self.num_classes, threshold=0.5)
 
-        self.train_stat_curves = MultiLabelStatCurves(len(self.classes))
-        self.val_stat_curves = MultiLabelStatCurves(len(self.classes))
-        self.test_stat_curves = MultiLabelStatCurves(len(self.classes))
+        self.train_stat_curves = MultiLabelStatCurves(self.num_classes)
+        self.val_stat_curves = MultiLabelStatCurves(self.num_classes)
+        self.test_stat_curves = MultiLabelStatCurves(self.num_classes)
 
     def forward(self, x):
-        batch_size, num_chunks, frames, width, height, channels = x.size()
-        # todo: data layer
+        batch_size, num_chunks, channels, frames, width, height = x.size()
 
-        print(x.shape)
+        assert batch_size <= self.hparams.batch_size  # smaller if test loop
+        assert num_chunks <= 5
+        assert channels == 3
+        assert frames == self.hparams.num_frames
+        assert width == height
+
+        # todo: data layer
 
         # transforms
         for batch in range(batch_size):
@@ -73,14 +78,19 @@ class Classifier(LightningModule):
         # reshape chunks to extra samples (6D -> 5D)
         x = x.reshape((-1,) + x.shape[2:])
 
+        assert len(x.shape) == 5
+        assert x.shape[1] == 3
+
         out = self.backbone(x)
 
         # reshape back to one score per sample
-        out = out.view(batch_size // num_chunks, num_chunks, -1)
+        out = out.view(batch_size, num_chunks, -1)
         if self.hparams.consensus == 'avg':
             out = out.mean(dim=1)
         elif self.hparams.consensus == 'max':
             out = out.max(dim=1).values
+
+        assert len(out) == batch_size
 
         return out
 
@@ -173,7 +183,7 @@ class Classifier(LightningModule):
         return {'losses': losses, 'meta': info, 'loss': batch_loss}
 
     def training_epoch_end(self, outputs):
-        outputs = outputs[0][0]['extra']
+        outputs = {k: [dic[k] for dic in outputs] for k in outputs[0]}
 
         train_time = time.time() - self.epoch_start
 
@@ -185,7 +195,7 @@ class Classifier(LightningModule):
         self.log('train_hamming_loss', self.train_stat_scores.hamming_loss())
         self.log('train_time', train_time, on_epoch=True)
 
-        self.log('train_loss', outputs['losses'].mean())
+        self.log('train_loss', torch.cat(outputs['losses'], dim=0).mean())
 
         self.log('train_auroc_micro', self.train_stat_curves.auroc('micro'))
         self.log('train_auroc_macro', self.train_stat_curves.auroc('macro'))
@@ -219,6 +229,8 @@ class Classifier(LightningModule):
 
     def validation_epoch_end(self, outputs):
 
+        outputs = {k: [dic[k] for dic in outputs] for k in outputs[0]}
+
         self.log('val_precision_macro', self.val_stat_scores.precision('macro'))
         self.log('val_recall_macro', self.val_stat_scores.recall('macro'))
         self.log('val_balanced_acc_macro', self.val_stat_scores.balanced_accuracy('macro'), prog_bar=True)
@@ -226,7 +238,7 @@ class Classifier(LightningModule):
         self.log('val_balanced_acc_micro', self.val_stat_scores.balanced_accuracy('micro'))
         self.log('val_hamming_loss', self.val_stat_scores.hamming_loss())
 
-        self.log('val_loss', outputs['losses'].mean())
+        self.log('val_loss', torch.cat(outputs['losses'], dim=0).mean())
 
         self.log('val_auroc_micro', self.val_stat_curves.auroc('micro'))
         self.log('val_auroc_macro', self.val_stat_curves.auroc('macro'))
@@ -260,7 +272,9 @@ class Classifier(LightningModule):
 
     def test_epoch_end(self, outputs):
 
-        self.log('test_loss', outputs['losses'].mean())
+        outputs = {k: [dic[k] for dic in outputs] for k in outputs[0]}
+
+        self.log('test_loss', torch.cat(outputs['losses'], dim=0).mean())
 
     def count_parameters(self):
         trainable_parameters = 0

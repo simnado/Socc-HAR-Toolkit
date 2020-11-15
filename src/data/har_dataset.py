@@ -193,16 +193,19 @@ class HarDataset(Dataset):
     def _get_chunks(self, x):
         """see mmaction2 (SampleFrames)
         """
-        x_len = x.shape[0]
+        assert x.shape[0] == 3
+        x_len = x.shape[1]  # C x T x S^2
         if self.num_chunks == 1:
             return torch.unsqueeze(x, 0)
-        avg_interval = (x_len - self.num_frames + 1) / float(self.num_chunks - 1)
+        avg_interval = (x_len - self.num_frames) / float(self.num_chunks - 1)
         if self.num_frames < x_len - 1:
             clip_offsets = (np.arange(self.num_chunks) * avg_interval).astype(np.int)
         else:
             print('cannot sample segments')
             clip_offsets = np.zeros((self.num_chunks, ), dtype=np.int)
-        return torch.stack([x[start:start + self.num_frames] for start in clip_offsets])
+        x = torch.stack([x[:, start:start + self.num_frames] for start in clip_offsets])
+        assert x.shape[1] == 3
+        return x   # Chunks x C x T x S^2
 
     def precompute_mean_and_std(self):
         mean_channel_1 = []

@@ -42,7 +42,7 @@ class Reporter(Callback):
             self.push(self.train_data, outputs)
 
     def on_train_epoch_end(self, trainer, pl_module, outputs):
-        self._report('train', self.train_data, pl_module.train_stat_curves.scores, pl_module.train_stat_curves.y, trainer.current_epoch)
+        self._report('train', self.train_data, pl_module.train_stat_curves.scores, pl_module.train_stat_curves.target, trainer.current_epoch)
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         if batch_idx == 0:
@@ -51,7 +51,7 @@ class Reporter(Callback):
             self.push(self.val_data, outputs)
 
     def on_validation_epoch_end(self, trainer, pl_module):
-        self._report('val', self.val_data, pl_module.val_stat_curves.scores, pl_module.val_stat_curves.y, trainer.current_epoch)
+        self._report('val', self.val_data, pl_module.val_stat_curves.scores, pl_module.val_stat_curves.target, trainer.current_epoch)
 
     def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         if batch_idx == 0:
@@ -61,7 +61,7 @@ class Reporter(Callback):
 
     def on_test_epoch_end(self, trainer, pl_module):
 
-        self._report('test', self.test_data, pl_module.test_stat_curves.scores, pl_module.test_stat_curves.y, trainer.current_epoch)
+        self._report('test', self.test_data, pl_module.test_stat_curves.scores, pl_module.test_stat_curves.target, trainer.current_epoch)
 
     def _report(self, context: str, data: dict, scores: torch.Tensor, y: torch.Tensor, epoch: int):
 
@@ -71,13 +71,13 @@ class Reporter(Callback):
             columns=['subset', 'key', 'video', 'start', 'end', 'labels', 'critical', 'epoch', 'index', 'y', 'scores',
                      'loss'])
 
-        for idx in worst_idx:
-            info = data['meta'][idx.item()]
+        for row in worst_idx:
+            info = data['meta'][row.item()]
             df = df.append({'key': info['key'], 'video': info['video'], 'start': info['start'], 'end': info['end'],
                             'critical': info['critical'],
                             'index': int(info['index']),
                             'labels': ', '.join(
-                                [self.classes[idx] for idx in torch.arange(0, 32)[y[idx] > 0]])},
+                                [self.classes[idx] for idx in torch.arange(0, 32)[y[row] > 0] ])},
                            ignore_index=True)
 
         df['loss'] = data['losses'][worst_idx].tolist()
@@ -91,5 +91,5 @@ class Reporter(Callback):
 
     @staticmethod
     def push(data: dict, out):
-        data['y'] = torch.cat([data['y'], out['y']], dim=0)
+        data['losses'] = torch.cat([data['losses'], out['losses']], dim=0)
         data['meta'] += out['meta']
