@@ -19,3 +19,7 @@ class TrainLogger(CometLogger):
 
     def log_metric(self, key, value, step):
         return self.experiment.log_metric(key, value, step=step)
+
+    @staticmethod
+    def from_existing_run(experiment_key: str):
+        return CometLogger(api_key=COMET_API_TOKEN, experiment_key=experiment_key)

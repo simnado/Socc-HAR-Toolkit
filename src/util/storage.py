@@ -34,11 +34,12 @@ class Storage:
 
             experiment = self.comet_api.get(experiment_path)
             assets = experiment.get_asset_list()
-            ckpt = next(asset for asset in assets if 'report.pt' in asset['fileName'])
+            reports = [asset for asset in assets if 'report.csv' in asset['fileName']]
+            report = reports[-1]
 
-            if ckpt:
+            if report:
                 print('download report from ' + experiment_path)
-                bin = experiment.get_asset(ckpt['assetId'], 'binary')
+                bin = experiment.get_asset(report['assetId'], 'binary')
                 with filename.open('wb') as file:
                     file.write(bin)
             else:
