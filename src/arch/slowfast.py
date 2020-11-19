@@ -1,5 +1,6 @@
 from pathlib import Path
 from torch import nn
+import torch
 from src.arch.backbone import Backbone
 from src.util.fetch import Fetcher
 
