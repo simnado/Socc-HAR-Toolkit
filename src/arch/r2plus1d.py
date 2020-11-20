@@ -29,7 +29,8 @@ class R2Plus1D_34(Backbone):
                 pretrained2d=False,
                 norm_eval=False,
                 conv_cfg=dict(type='Conv2plus1d'),
-                norm_cfg=dict(type='BN3d', requires_grad=True, eps=1e-3),  # changed from SyncBN
+                #norm_cfg=dict(type='SyncBN', requires_grad=True, eps=1e-3),
+                norm_cfg=dict(type='BN3d', requires_grad=True, eps=1e-5),
                 act_cfg=dict(type='ReLU', inplace=True),
                 conv1_kernel=(3, 7, 7),
                 conv1_stride_t=1,

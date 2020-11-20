@@ -158,9 +158,9 @@ class HarDataset(Dataset):
         return len(self.x)
 
     def get_tensor(self, index, resize=True):
-        index = self.x[index]
+        clip_index = self.x[index]
 
-        video_idx, clip_idx = self.video_clips.get_clip_location(index)
+        video_idx, clip_idx = self.video_clips.get_clip_location(clip_index)
         video_path = self.video_clips.video_paths[video_idx]
 
         if self.backend == 'av':
@@ -168,13 +168,16 @@ class HarDataset(Dataset):
             start_pts = clip_pts[0].item()
             end_pts = clip_pts[-1].item()
             frames, _, _ = io.read_video(video_path, start_pts, end_pts)
+            assert frames.shape[0] >= self.num_frames, f'tensor on index={index} has only {frames.shape[0]} frames'
             # todo: maybe faster?
             # frames, _, _ = io._video_opt._read_video_from_file(video_path, video_width=224, video_height=224, video_pts_range=(start_pts, end_pts), read_audio_stream=False)
             resampling_idx = self.video_clips.resampling_idxs[video_idx][clip_idx]
             if isinstance(resampling_idx, torch.Tensor):
                 resampling_idx = resampling_idx - resampling_idx[0]
-                resampling_idx = resampling_idx[resampling_idx < len(frames)]
+                # sometimes the last frame of a clip gets lost. if so repeat last frame at the end
+                resampling_idx[resampling_idx >= len(frames)] = len(frames) - 1
             frames = frames[resampling_idx]
+            assert frames.shape[0] >= self.num_frames, f'resampled tensor on index={index} has only {frames.shape[0]} frames after resampling of {len(resampling_idx)} indices'
         else:
             clip_pts = self.video_clips.resampling_idxs[video_idx][clip_idx]
             vr = de.VideoReader(video_path, num_threads=1) #, ctx=de.gpu())
@@ -185,8 +188,9 @@ class HarDataset(Dataset):
         # todo: run on gpu
         frames = VideoTransformation(res=self.res if resize else 360, do_augmentation=self.do_augmentation)(frames)
 
-        # reshape if test loop from 4D to 5D (Chunks x Frames x H x W x C)
+        # reshape if test loop from 4D to 5D (Chunks x C x T x H x W)
         frames = self._get_chunks(frames)
+        assert frames.shape[2] >= self.num_frames, f'chunked tensor on index={index} has only {frames.shape[2]} frames'
 
         return frames
 

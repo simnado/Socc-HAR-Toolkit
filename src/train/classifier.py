@@ -145,7 +145,7 @@ class Classifier(LightningModule):
         elif self.hparams.scheduler == 'cycle':
             total_steps = math.ceil(self.hparams.epochs * self.train_iterations / self.accumulate_grad_batches)
             lr_scheduler = OneCycleLR(optimizer, max_lr=max_lrs, div_factor=10, total_steps=total_steps,
-                                      pct_start=0.25, verbose=True)
+                                      pct_start=0.25, verbose=False)
             lr_scheduler = {
                 'scheduler': lr_scheduler,
                 'interval': 'step',
@@ -306,7 +306,6 @@ class Classifier(LightningModule):
         for layer in list(itertools.chain(*self.trainable_layers)):
             for name, param in layer.named_parameters():
                 param.requires_grad = True
-                print(f'{name} is trainable')
 
     @property
     def trainable_layers(self):

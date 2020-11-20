@@ -136,7 +136,6 @@ class DataModule(LightningDataModule):
 
     @staticmethod
     def collate(batch):
-        #print(f'collate {len(batch)} samples to one batch')
         transposed_data = list(zip(*batch))
         x = torch.stack(transposed_data[0], 0)
         y = torch.stack(transposed_data[1], 0)
