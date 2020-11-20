@@ -63,7 +63,7 @@ class EvaluationModule:
             samples = torch.sum(torch.tensor([self.dm.stats[context].samples for context in ['train', 'val', 'test']]), dim=0)
             resamples = torch.sum(torch.stack([self.dm.stats[context].resamples + [self.dm.stats[context].background_resamples] for context in ['train', 'val', 'test']]), dim=0)
 
-        plt.xticks(rotation=45, ha="right")
+        plt.xticks(rotation=90, ha="right")
         ax.bar(self.dm.classes, samples, label='samples')
         if context in ['train', 'val', 'test'] and show == 'used_samples':
             ax.bar(self.dm.classes + ['background'], resamples, label='used samples')
@@ -144,7 +144,6 @@ class EvaluationModule:
 
         dataset = self.dm.datasets[context]
         stats = self.dm.stats[context]
-        num_samples = len(dataset)
 
         if pred:
             assert indices and len(pred) == len(indices), 'length of `pred` has to match length of `indices`'
