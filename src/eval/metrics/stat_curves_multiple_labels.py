@@ -65,32 +65,38 @@ class MultiLabelStatCurves(Metric):
         elif class_reduction is None:
             return xs, class_curves
 
-    def roc(self, class_reduction=None):
-        fpr = dict()
-        tpr = dict()
-        thresholds = dict()
-        peaks = dict()
+    def roc(self, class_reduction: [str], class_idxs: [int]):
+        fpr = []
+        tpr = []
+        thresholds = []
+        peak_idxs = []
 
-        if class_reduction == 'micro':
-            targets = torch.reshape(self.target, -1)
-            scores = torch.reshape(self.scores, -1)
-            fpr, tpr, thresholds = roc_curve(targets, scores)
-            peaks = thresholds[np.argmax(tpr - fpr)]
-        else:
-            for i in range(self.num_classes):
-                fpr[i], tpr[i], thresholds[i] = roc_curve(self.target[:, i], self.scores[:, i])
-                peaks[i] = thresholds[i][np.argmax(tpr[i] - fpr[i])]
-                # todo: auc_score = auc(fpr[i], tpr[i])
-            if class_reduction == 'macro':
-                # todo:
-                pass
+        if 'micro' in class_reduction:
+            targets = torch.flatten(self.target)
+            scores = torch.flatten(self.scores)
+            fpr_m, tpr_m, thresholds_m = roc_curve(targets, scores)
 
-        return fpr, tpr, thresholds, peaks
+            fpr.append(fpr_m)
+            tpr.append(tpr_m)
+            thresholds.append(thresholds_m)
+            peak_idxs.append(np.argmax(tpr_m - fpr_m))
+        for i in class_idxs:
+            fpr_c, tpr_c, thresholds_c = roc_curve(self.target[:, i], self.scores[:, i])
+            fpr.append(fpr_c)
+            tpr.append(tpr_c)
+            thresholds.append(thresholds_c)
+
+            peak_idxs.append(np.argmax(tpr_c - fpr_c))
+        if 'macro' in class_reduction:
+            # todo:
+            pass
+
+        return fpr, tpr, thresholds, peak_idxs
 
     def auroc(self, class_reduction: str):
 
         try:
-            if class_reduction is None:
+            if class_reduction is 'none':
                 return roc_auc_score(self.target.cpu(), self.scores.cpu(), average=None)
             elif class_reduction in ['micro', 'macro']:
                 return roc_auc_score(self.target.cpu(), self.scores.cpu(), average=class_reduction)
