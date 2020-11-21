@@ -29,7 +29,7 @@ class Storage:
 
     def get_report(self, experiment_path: str) -> Path:
 
-        filename = Path(f'{experiment_path.replace("/", "_")}.pt')
+        filename = Path(f'{experiment_path.replace("/", "_")}.csv')
         if experiment_path and not filename.exists():
 
             experiment = self.comet_api.get(experiment_path)

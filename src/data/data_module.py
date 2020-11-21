@@ -108,7 +108,7 @@ class DataModule(LightningDataModule):
 
         print(f'sample {self.num_train_samples}/{len(self.datasets["train"])} random clips')
         # should be different each iteration
-        sampler = WeightedRandomSampler(self.stats['train'].weights, int(self.num_train_samples))
+        sampler = WeightedRandomSampler(weights=self.stats['train'].weights, num_samples=int(self.num_train_samples), replacement=False)
         dl = DataLoader(self.datasets["train"], batch_size=self.batch_size, sampler=sampler,
                         num_workers=self.num_data_workers, collate_fn=self.collate)
         return dl

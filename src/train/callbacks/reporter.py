@@ -30,9 +30,10 @@ class Reporter(Callback):
         self.report_file = self.out_dir.joinpath('report.csv')
 
     def on_fit_start(self, trainer, pl_module):
-        self.df = pd.DataFrame(
-            columns=['subset', 'key', 'video', 'start', 'end', 'labels', 'critical', 'epoch', 'index', 'y', 'scores',
-                     'loss'])
+        #self.df = pd.DataFrame(
+        #    columns=['subset', 'key', 'video', 'start', 'end', 'labels', 'critical', 'epoch', 'index', 'y', 'scores',
+        #             'loss'])
+        pass
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         outputs = outputs[0][0]['extra']

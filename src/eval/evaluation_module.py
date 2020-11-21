@@ -41,6 +41,7 @@ class EvaluationModule:
 
         ax1.pie(sizes, labels=labels, autopct='%1.1f%%')
         ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+        plt.tight_layout()
         plt.close()
 
         self._handle(fig, context, 'background_ratio', save, upload)
@@ -74,6 +75,7 @@ class EvaluationModule:
         ax.set_title(f'{context} set' if context != 'all' else 'all data sets')
         ax.legend()
         ax.set_yscale('log')
+        plt.tight_layout()
         plt.close()
 
         self._handle(fig, context, f'class_distribution_{show}', save, upload)
@@ -102,6 +104,7 @@ class EvaluationModule:
         display.plot(ax=ax, cmap=plt.cm.Blues, xticks_rotation='vertical', values_format='.2g')
         ax.set(ylabel="Samples",
                xlabel="Overlaps")
+        plt.tight_layout()
 
         self._handle(fig, context, 'pairwise_occurrences', save, upload)
 

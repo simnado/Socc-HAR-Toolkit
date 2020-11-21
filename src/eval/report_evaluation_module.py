@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from pathlib import Path
 import torch
 import pandas as pd
+import numpy as np
 from src.data import HarDataset, DataModule, MediaDir
 from src.eval import OutDir, ClipPlot, PlotIterator, EvaluationModule
 
@@ -21,11 +22,11 @@ class ReportEvaluationModule(EvaluationModule):
         sample = df[(df.subset == context) & (df.epoch == epoch)].sample()
 
         # todo: context=all
-        paths = [path for path in self.dm.datasets[context].video_metadata['video_paths'] if sample.video in path]
+        paths = [path for path in self.dm.datasets[context].video_metadata['video_paths'] if sample.video.item() in path]
 
-        preds = np.fromstring(sample.scores.tolist()[0][1:-1], dtype=float, sep=' ')
+        preds = np.fromstring(sample.scores.item()[1:-1], dtype=float, sep=', ')
         preds = torch.from_numpy(preds)
-        return self.get_sample_plot(video=Path(paths[0]), offset=sample.start, pred=preds)
+        return self.get_sample_plot(video=Path(paths[0]), offset=sample.start.item(), pred=preds)
 
     def get_top_loss_plots(self, context='train', epoch=None, limit=50):
         # todo:
@@ -44,7 +45,7 @@ class ReportEvaluationModule(EvaluationModule):
                 assert len(df[(df.key == row.key) & (df.start == row.start)]) == self.num_test_runs
 
         # train is not deterministic
-        occs = [len(df[(df.key == row.key) & (df.start == row.start)]) for index, row in df[df.subset == 'test'].sample(n=10).iterrows()]
+        occs = [len(df[(df.key == row.key) & (df.start == row.start)]) for index, row in df[df.subset == 'train'].sample(n=10).iterrows()]
         occs = [occ == occs[0] for occ in occs]
         assert False in occs
 
@@ -66,10 +67,12 @@ class ReportEvaluationModule(EvaluationModule):
         ax.set_title(f'train samples per epoch')
 
         occs = [[self._label_occurances('train', epoch, label) for epoch in range(self.num_epochs)] for label in self.dm.classes]
-        occs = occs + [self._background_occurances('train', epoch) for epoch in range(self.num_epochs)]
+        occs = occs + [[self._background_occurances('train', epoch) for epoch in range(self.num_epochs)]]
 
-        ax.boxplot(occs, vert=True, patch_artist=True, labels=self.dm.classes)
+        ax.hlines(self.dm.limit_per_class['train'], -0.5, 33.5, color='grey')
+        ax.boxplot(occs, vert=True, patch_artist=True, labels=self.dm.classes + ['background'])
 
+        plt.tight_layout()
         plt.close()
 
         self._handle(fig, 'train', f'samples', save, upload)
