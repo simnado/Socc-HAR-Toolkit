@@ -115,7 +115,7 @@ class ReportEvaluationModule(EvaluationModule):
     def _init_test_scalars(self, threshold: int):
         assert -1 < threshold < 101
         if self.test_scalars[threshold] is None:
-            scalars = MultiLabelStatScores(self.dm.num_classes, threshold=0.5)
+            scalars = MultiLabelStatScores(self.dm.num_classes, threshold=threshold / 100.0)
             scalars(self._get_scores('test', self.num_test_runs - 1), self._get_y('test', self.num_test_runs - 1))
             self.test_scalars[threshold] = scalars
 
@@ -313,7 +313,29 @@ class ReportEvaluationModule(EvaluationModule):
         pass
 
     def get_threshold_by_metric(self, split: str, metric: str, reduction: str, save=True, upload=False):
-        pass
+        fig, ax = plt.subplots(dpi=120)
+        ax.set_title(f'threshold by {reduction} {metric}')
+        ax.set_xlabel('threshold')
+        ax.set_ylabel(f'score')
+
+        for i in range(100):
+            self._init_test_scalars(i)
+        # todo: support classes like in get_curve
+        x = torch.linspace(0.01, 1.0, 100)
+        metrics = [getattr(scalar, metric)(reduction) for scalar in self.test_scalars]
+        color = next(ax._get_lines.prop_cycler)['color']
+        peak = torch.argmax(torch.Tensor(metrics)).item()
+        ax.plot(x, metrics, color=color)
+        ax.plot(x[peak], metrics[peak], color=color, marker='o')
+
+        if upload:
+            # todo: move to _handle()
+            self.logger.log_metric(f'threshold_by_{metric}_{reduction}', x[peak])
+
+        plt.tight_layout()
+        plt.close()
+        self._handle(fig, split, f'threshold by {reduction} {metric}', save, upload)
+        return fig
 
     @property
     def num_epochs(self):

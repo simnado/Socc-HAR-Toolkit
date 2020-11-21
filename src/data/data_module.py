@@ -60,6 +60,10 @@ class DataModule(LightningDataModule):
                                            res=360)
         self.video_metadata = self.pre_processor.prepare_data()
 
+        invalid_frame_rates = [idx for idx, fps in enumerate(self.video_metadata['video_fps']) if fps < self.fps]
+        if len(invalid_frame_rates):
+            print(f'WARNING: found {len(invalid_frame_rates)} clips with lower frame rate than {self.fps}')
+
     def setup(self, stage: Optional[str] = None):
 
         assert self.video_metadata, "No video metadata found, run prepare_data() first"

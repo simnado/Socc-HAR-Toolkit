@@ -48,23 +48,6 @@ class MultiLabelStatCurves(Metric):
         # todo: return default metric
         return self.sup.sum()
 
-    def threshold_finder_scalar(self, class_reduction='macro'):
-        xs = torch.linspace(0.05, 0.95, 29)
-
-        metric = Accuracy
-
-        if class_reduction == 'micro':
-            return [metric(torch.reshape(self.target, (-1,)), torch.reshape(self.scores, -1), threshold=i) for i in xs]
-
-        class_curves = torch.zeros((32, len(xs)))
-        for cls in range(self.num_classes):
-            class_curves[cls] = torch.stack([metric(threshold=i)(self.target[:, cls], self.scores[:, cls]) for i in xs])
-
-        if class_reduction == 'macro':
-            return xs, class_curves.mean(dim=1)
-        elif class_reduction is None:
-            return xs, class_curves
-
     def roc(self, class_reduction: [str], class_idxs: [int]):
         fpr = []
         tpr = []

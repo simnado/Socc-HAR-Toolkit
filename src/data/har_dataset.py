@@ -168,7 +168,8 @@ class HarDataset(Dataset):
             start_pts = clip_pts[0].item()
             end_pts = clip_pts[-1].item()
             frames, _, _ = io.read_video(video_path, start_pts, end_pts)
-            assert frames.shape[0] >= self.num_frames, f'tensor on index={index} has only {frames.shape[0]} frames'
+            if frames.shape[0] < self.num_frames:
+                print(f'WARNING: tensor on index={index} has only {frames.shape[0]} frames')
             # todo: maybe faster?
             # frames, _, _ = io._video_opt._read_video_from_file(video_path, video_width=224, video_height=224, video_pts_range=(start_pts, end_pts), read_audio_stream=False)
             resampling_idx = self.video_clips.resampling_idxs[video_idx][clip_idx]
