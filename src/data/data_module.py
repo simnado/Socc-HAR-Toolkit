@@ -60,7 +60,8 @@ class DataModule(LightningDataModule):
                                            res=360)
         self.video_metadata = self.pre_processor.prepare_data()
 
-        invalid_frame_rates = [idx for idx, fps in enumerate(self.video_metadata['video_fps']) if fps < self.fps]
+        fps = self.video_metadata['train']['video_fps'] + self.video_metadata['val']['video_fps'] + self.video_metadata['test']['video_fps']
+        invalid_frame_rates = [idx for idx, fps in enumerate(fps) if fps < self.fps]
         if len(invalid_frame_rates):
             print(f'WARNING: found {len(invalid_frame_rates)} clips with lower frame rate than {self.fps}')
 
@@ -130,7 +131,7 @@ class DataModule(LightningDataModule):
 
         # sampler = SubsetRandomSampler(self.indices["test"])
         dl = DataLoader(self.datasets["test"], batch_size=self.batch_size, num_workers=self.num_data_workers,
-                        collate_fn=self.collate)
+                        collate_fn=self.collate, shuffle=False)
 
         return dl
 

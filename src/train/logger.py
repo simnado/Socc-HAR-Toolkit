@@ -22,4 +22,4 @@ class TrainLogger(CometLogger):
 
     @staticmethod
     def from_existing_run(experiment_key: str):
-        return CometLogger(api_key=COMET_API_TOKEN, experiment_key=experiment_key)
+        return CometLogger(api_key=COMET_API_TOKEN, experiment_key=experiment_key.split('/').pop())

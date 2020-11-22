@@ -52,7 +52,13 @@ class ReportEvaluationModule(EvaluationModule):
                 assert len(df[(df.key == row.key) & (df.start == row.start)]) == self.num_test_runs
 
         # train is not deterministic
-        occs = [len(df[(df.key == row.key) & (df.start == row.start)]) for index, row in df[df.subset == 'train'].sample(n=10).iterrows()]
+        occs = []
+        for index, row in df[df.subset == 'train'].sample(n=10).iterrows():
+            occ = len(df[(df.key == row.key) & (df.start == row.start)])
+            assert occ <= self.num_epochs
+            occs.append(occ)
+
+        # occurances should be different
         occs = [occ == occs[0] for occ in occs]
         assert False in occs
 
@@ -85,7 +91,7 @@ class ReportEvaluationModule(EvaluationModule):
     def train_samples_boxplot(self, save=True, upload=True):
         fig, ax = plt.subplots(dpi=120)
 
-        plt.xticks(rotation=90, ha="right")
+        plt.xticks(rotation=90)
 
         ax.set_title(f'train samples per epoch')
 
@@ -116,7 +122,7 @@ class ReportEvaluationModule(EvaluationModule):
         assert -1 < threshold < 101
         if self.test_scalars[threshold] is None:
             scalars = MultiLabelStatScores(self.dm.num_classes, threshold=threshold / 100.0)
-            scalars(self._get_scores('test', self.num_test_runs - 1), self._get_y('test', self.num_test_runs - 1))
+            scalars(self._get_scores('test', self.num_epochs - 1), self._get_y('test', self.num_epochs - 1))
             self.test_scalars[threshold] = scalars
 
     def _init_train_curve(self):
@@ -134,7 +140,7 @@ class ReportEvaluationModule(EvaluationModule):
     def _init_test_curve(self):
         if self.test_curve is None:
             curve = MultiLabelStatCurves(self.dm.num_classes)
-            curve(self._get_scores('test', self.num_test_runs - 1), self._get_y('test', self.num_test_runs - 1))
+            curve(self._get_scores('test', self.num_epochs - 1), self._get_y('test', self.num_epochs - 1))
             self.test_curve = curve
 
     def get_metric_by_epoch(self, metric: str, reduction: str, save=True, upload=False):
@@ -267,7 +273,8 @@ class ReportEvaluationModule(EvaluationModule):
         scalars: Optional[MultiLabelStatScores] = None
         curve: Optional[MultiLabelStatCurves] = None
         fig, ax = plt.subplots(dpi=120)
-        ax.set_title(f'{metric} by class')
+        title = f'{metric} by class'
+        ax.set_title(title)
 
         if split == 'train':
             self._init_train_curve()
@@ -306,7 +313,7 @@ class ReportEvaluationModule(EvaluationModule):
 
         plt.tight_layout()
         plt.close()
-        self._handle(fig, 'train', f'samples', save, upload)
+        self._handle(fig, 'train', title, save, upload)
         return fig
 
     def cluster_classes_by_metrics(self, split: str, save=True, upload=False):
@@ -330,7 +337,7 @@ class ReportEvaluationModule(EvaluationModule):
 
         if upload:
             # todo: move to _handle()
-            self.logger.log_metric(f'threshold_by_{metric}_{reduction}', x[peak])
+            self.logger.log_metrics({f'threshold_by_{metric}_{reduction}': x[peak]})
 
         plt.tight_layout()
         plt.close()
