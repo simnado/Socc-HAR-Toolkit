@@ -1,5 +1,8 @@
 from torch import nn
+import torch
+from pathlib import Path
 from src.arch.backbone import Backbone
+from src.util.fetch import Fetcher
 
 ircsn_ig65m_pretrained_bnfrozen_r152_32x2x1_58e_kinetics400_rgb = 'https://download.openmmlab.com/mmaction/recognition/csn/ircsn_ig65m_pretrained_bnfrozen_r152_32x2x1_58e_kinetics400_rgb/ircsn_ig65m_pretrained_bnfrozen_r152_32x2x1_58e_kinetics400_rgb_20200812-9037a758.pth'
 
@@ -7,15 +10,24 @@ ircsn_ig65m_pretrained_bnfrozen_r152_32x2x1_58e_kinetics400_rgb = 'https://downl
 class irCSN_152(Backbone):
     @property
     def groups(self) -> [[nn.Module]]:
-        return [[self.backbone.conv1], [self.backbone.layer1], [self.backbone.layer2], [self.backbone.layer3], [self.backbone.layer4], [self.cls_head.fc_cls]]
+        return [[self.backbone.conv1], [self.backbone.layer1], [self.backbone.layer2], [self.backbone.layer3],
+                [self.backbone.layer4], [self.cls_head.fc_cls]]
 
     def __init__(self, num_classes):
+        checkpoints = Fetcher().load(ircsn_ig65m_pretrained_bnfrozen_r152_32x2x1_58e_kinetics400_rgb, Path('.'))
+        checkpoints_exp = checkpoints.parent.joinpath(f'{checkpoints.name}_exp.pt')
+        if not checkpoints_exp.exists():
+            input = torch.load(checkpoints)['state_dict']
+            out = {k[9:]: v for k, v in input.items()}
+            out = dict(state_dict=out)
+            torch.save(out, checkpoints.parent.joinpath(checkpoints_exp))
+
         model = dict(
             type='Recognizer3D',
             backbone=dict(
                 type='ResNet3dCSN',
                 pretrained2d=False,
-                pretrained='modelzoo/irCSN_152_ig65m_from_scratch_lite_new.pth',
+                pretrained=None,  # 'modelzoo/irCSN_152_ig65m_from_scratch_lite_new.pth',
                 depth=152,
                 with_pool2=False,
                 bottleneck_mode='ir',
