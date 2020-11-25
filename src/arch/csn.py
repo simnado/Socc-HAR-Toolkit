@@ -31,8 +31,8 @@ class irCSN_152(Backbone):
                 depth=152,
                 with_pool2=False,
                 bottleneck_mode='ir',
-                norm_eval=True,
-                bn_frozen=True,
+                norm_eval=False,
+                # bn_frozen=True,
                 zero_init_residual=False),
             cls_head=dict(
                 type='I3DHead',
