@@ -324,7 +324,7 @@ class Classifier(LightningModule):
 
     @property
     def accumulate_grad_batches(self):
-        return 64 // self.hparams.batch_size
+        return max(1, 64 // self.hparams.batch_size)
 
     @property
     def train_iterations(self):
