@@ -33,6 +33,11 @@ class Classifier(LightningModule):
         self.backbone = backbone
         self.hparams.name = self.backbone.__class__.__name__
 
+        if self.hparams.pretrained_path is None:
+            self.hparams.pretrained_path = self.backbone.provide_pretrained_weights()
+        if self.hparams.pretrained_path is not None:
+            self.load_weights()
+
         self.id = f'{self.hparams.name}_{trainable_groups}g_{num_frames}x{res}x{res}_{fps}fps_{optim}_{scheduler}_{epochs}ep_wd={weight_decay}'
         if pretrained_path:
             self.id = f'{self.id}_pretrainedOn{pretrained_path.name}'
@@ -294,7 +299,7 @@ class Classifier(LightningModule):
 
     def unfreeze_layers(self, only_head=False, groups=None):
         if groups is None:
-            groups = len(self.layers)
+            groups = len(self.backbone.groups)
         if only_head:
             groups = 1
 
@@ -329,9 +334,29 @@ class Classifier(LightningModule):
         if self.hparams.pretrained_path and self.hparams.pretrained_path.exists():
             state = torch.load(str(self.hparams.pretrained_path))
             if 'state_dict' in state:
+                state = state['state_dict']
+
+            try:
                 self.load_state_dict(state['state_dict'], strict=True)
-                print('weights loaded.')
+                print('all weights loaded')
                 return True
+            except RuntimeError:
+                pass
+            except KeyError:
+                pass
+
+            fc_layers = [f'cls_head.{name}' for name, param in self.backbone.groups[-1][0].named_parameters()]
+            state = {k: v for k, v in state.items() if k not in fc_layers}
+            try:
+                self.backbone.load_state_dict(state, strict=False)
+                print(f'backbone weights loaded. head layers ignored: {", ".join(fc_layers)}')
+                return True
+            except RuntimeError:
+                pass
+
+            print('cannot load weights.')
+        else:
+            print('no pretrained weight provided')
 
         return False
 

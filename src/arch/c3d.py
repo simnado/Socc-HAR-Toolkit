@@ -1,18 +1,22 @@
-from torch import nn
+from pathlib import Path
+from typing import Optional
 from src.arch.backbone import Backbone
-
-c3d_sports1m_16x1x1_45e_ucf101_rgb = 'https://download.openmmlab.com/mmaction/recognition/c3d/c3d_sports1m_pretrain_20201016-dcc47ddc.pth'
+from src.util.fetch import Fetcher
 
 
 class C3D(Backbone):
+
+    @staticmethod
+    def provide_pretrained_weights() -> Optional[Path]:
+        url = 'https://download.openmmlab.com/mmaction/recognition/c3d/c3d_sports1m_pretrain_20201016-dcc47ddc.pth'
+        return Fetcher().load(url, Path('.'))
 
     def __init__(self, num_classes):
         model = dict(
             type='Recognizer3D',
             backbone=dict(
                 type='C3D',
-                pretrained=  # noqa: E251
-                'https://download.openmmlab.com/mmaction/recognition/c3d/c3d_sports1m_pretrain_20201016-dcc47ddc.pth',
+                pretrained=None,
                 # noqa: E501
                 style='pytorch',
                 conv_cfg=dict(type='Conv3d'),

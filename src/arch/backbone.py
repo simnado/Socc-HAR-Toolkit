@@ -1,4 +1,7 @@
 from abc import abstractmethod
+from pathlib import Path
+from typing import Optional
+
 from torch import nn
 from mmaction.models import build_recognizer
 
@@ -17,13 +20,11 @@ class Backbone(nn.Module):
     def groups(self) -> [[nn.Module]]:
         pass
 
-    #@abstractmethod
-    #@staticmethod
-    #def provide_pretrained_weights(dest_path: Path) -> Path:
-    #    pass
+    @staticmethod
+    def provide_pretrained_weights() -> Optional[Path]:
+        return None
 
     def forward(self, x):
-
         x = self.backbone(x)
         x = self.cls_head(x)
         return x

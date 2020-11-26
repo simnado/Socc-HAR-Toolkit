@@ -1,11 +1,8 @@
 from pathlib import Path
+from typing import Optional
 from torch import nn
-import torch
 from src.arch.backbone import Backbone
 from src.util.fetch import Fetcher
-
-slowfast_r50_4x16x1_256e_kinetics400_rgb = 'https://download.openmmlab.com/mmaction/recognition/slowfast/slowfast_r50_4x16x1_256e_kinetics400_rgb/slowfast_r50_4x16x1_256e_kinetics400_rgb_20200704-bcde7ed7.pth'
-slowfast_r50_8x8x1_256e_kinetics400_rgb = 'https://download.openmmlab.com/mmaction/recognition/slowfast/slowfast_r50_8x8x1_256e_kinetics400_rgb/slowfast_r50_8x8x1_256e_kinetics400_rgb_20200716-73547d2b.pth'
 
 
 class SlowFast(Backbone):
@@ -21,19 +18,17 @@ class SlowFast(Backbone):
 
 class SlowFast4x16_50(SlowFast):
 
+    @staticmethod
+    def provide_pretrained_weights() -> Optional[Path]:
+        url = 'https://download.openmmlab.com/mmaction/recognition/slowfast/slowfast_r50_4x16x1_256e_kinetics400_rgb/slowfast_r50_4x16x1_256e_kinetics400_rgb_20200704-bcde7ed7.pth'
+        return Fetcher().load(url, Path('.'))
+
     def __init__(self, num_classes: int):
-        checkpoints = Fetcher().load(slowfast_r50_4x16x1_256e_kinetics400_rgb, Path('.'))
-        checkpoints_exp = checkpoints.parent.joinpath(f'{checkpoints.name}_exp.pt')
-        if not checkpoints_exp.exists():
-            input = torch.load(checkpoints)['state_dict']
-            out = {k[9:]: v for k, v in input.items()}
-            out = dict(state_dict=out)
-            torch.save(out, checkpoints.parent.joinpath(checkpoints_exp))
         model = dict(
             type='Recognizer3D',
             backbone=dict(
                 type='ResNet3dSlowFast',
-                pretrained=checkpoints_exp,
+                pretrained=None,
                 resample_rate=8,  # tau
                 speed_ratio=8,  # alpha
                 channel_ratio=8,  # beta_inv
@@ -69,14 +64,12 @@ class SlowFast4x16_50(SlowFast):
 
 class SlowFast8x8_50(SlowFast):
 
+    @staticmethod
+    def provide_pretrained_weights() -> Optional[Path]:
+        url = 'https://download.openmmlab.com/mmaction/recognition/slowfast/slowfast_r50_8x8x1_256e_kinetics400_rgb/slowfast_r50_8x8x1_256e_kinetics400_rgb_20200716-73547d2b.pth'
+        return Fetcher().load(url, Path('.'))
+
     def __init__(self, num_classes: int):
-        checkpoints = Fetcher().load(slowfast_r50_8x8x1_256e_kinetics400_rgb, Path('.'))
-        checkpoints_exp = checkpoints.parent.joinpath(f'{checkpoints.name}_exp.pt')
-        if not checkpoints_exp.exists():
-            input = torch.load(checkpoints)['state_dict']
-            out = {k[9:]: v for k, v in input.items()}
-            out = dict(state_dict=out)
-            torch.save(out, checkpoints.parent.joinpath(checkpoints_exp))
         model = dict(
             type='Recognizer3D',
             backbone=dict(
