@@ -11,12 +11,12 @@ x3d_m_facebook_16x5x1_kinetics400_rgb = 'https://download.openmmlab.com/mmaction
 class X3D(Backbone):
     @property
     def groups(self) -> [[nn.Module]]:
-        return [[self.backbone.slow_path.conv1, self.backbone.fast_path.conv1, self.backbone.slow_path.conv1_lateral],
-                [self.backbone.slow_path.layer1, self.backbone.fast_path.layer1, self.backbone.slow_path.layer1_lateral],
-                [self.backbone.slow_path.layer2, self.backbone.fast_path.layer2, self.backbone.slow_path.layer2_lateral],
-                [self.backbone.slow_path.layer3, self.backbone.fast_path.layer3, self.backbone.slow_path.layer3_lateral],
-                [self.backbone.slow_path.layer4, self.backbone.fast_path.layer4],
-                [self.cls_head.fc_cls]]
+        return [[self.backbone.conv1_s, self.backbone.conv1_t],
+                [self.backbone.layer1],
+                [self.backbone.layer2],
+                [self.backbone.layer3],
+                [self.backbone.layer4, self.backbone.conv5],
+                [self.cls_head]]
 
 
 class X3D_S(X3D):
@@ -25,7 +25,7 @@ class X3D_S(X3D):
         checkpoints = Fetcher().load(x3d_s_facebook_13x6x1_kinetics400_rgb, Path('.'))
         checkpoints_exp = checkpoints.parent.joinpath(f'{checkpoints.name}_exp.pt')
         if not checkpoints_exp.exists():
-            input = torch.load(checkpoints)['state_dict']
+            input = torch.load(checkpoints)
             out = {k[9:]: v for k, v in input.items()}
             out = dict(state_dict=out)
             torch.save(out, checkpoints.parent.joinpath(checkpoints_exp))
@@ -56,7 +56,7 @@ class X3D_M(X3D):
         checkpoints = Fetcher().load(x3d_m_facebook_16x5x1_kinetics400_rgb, Path('.'))
         checkpoints_exp = checkpoints.parent.joinpath(f'{checkpoints.name}_exp.pt')
         if not checkpoints_exp.exists():
-            input = torch.load(checkpoints)['state_dict']
+            input = torch.load(checkpoints)
             out = {k[9:]: v for k, v in input.items()}
             out = dict(state_dict=out)
             torch.save(out, checkpoints.parent.joinpath(checkpoints_exp))

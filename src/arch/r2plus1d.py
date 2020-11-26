@@ -10,7 +10,7 @@ r2plus1d_r34_32x2x1_180e_kinetics400_rgb = 'https://download.openmmlab.com/mmact
 class R2Plus1D_34(Backbone):
     @property
     def groups(self) -> [[nn.Module]]:
-        return [[self.backbone.conv1], [self.backbone.layer1], [self.backbone.layer2], [self.backbone.layer3], [self.backbone.layer4], [self.cls_head.fc_cls]]
+        return [[self.backbone.conv1], [self.backbone.layer1], [self.backbone.layer2], [self.backbone.layer3], [self.backbone.layer4], [self.cls_head]]
 
     def __init__(self, num_classes: int):
         checkpoints = Fetcher().load(r2plus1d_r34_32x2x1_180e_kinetics400_rgb, Path('.'))

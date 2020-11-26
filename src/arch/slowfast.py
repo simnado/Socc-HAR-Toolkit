@@ -16,7 +16,7 @@ class SlowFast(Backbone):
                 [self.backbone.slow_path.layer2, self.backbone.fast_path.layer2, self.backbone.slow_path.layer2_lateral],
                 [self.backbone.slow_path.layer3, self.backbone.fast_path.layer3, self.backbone.slow_path.layer3_lateral],
                 [self.backbone.slow_path.layer4, self.backbone.fast_path.layer4],
-                [self.cls_head.fc_cls]]
+                [self.cls_head]]
 
 
 class SlowFast4x16_50(SlowFast):

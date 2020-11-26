@@ -38,4 +38,4 @@ class C3D(Backbone):
                 [self.backbone.conv5a, self.backbone.conv5b],
                 [self.backbone.fc6],
                 [self.backbone.fc7],
-                [self.cls_head.fc_cls]]
+                [self.cls_head]]

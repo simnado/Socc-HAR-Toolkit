@@ -10,8 +10,12 @@ ircsn_ig65m_pretrained_bnfrozen_r152_32x2x1_58e_kinetics400_rgb = 'https://downl
 class irCSN_152(Backbone):
     @property
     def groups(self) -> [[nn.Module]]:
-        return [[self.backbone.conv1], [self.backbone.layer1], [self.backbone.layer2], [self.backbone.layer3],
-                [self.backbone.layer4], [self.cls_head.fc_cls]]
+        return [[self.backbone.conv1],
+                [self.backbone.layer1],
+                [self.backbone.layer2],
+                [self.backbone.layer3],
+                [self.backbone.layer4],
+                [self.cls_head]]
 
     def __init__(self, num_classes):
         checkpoints = Fetcher().load(ircsn_ig65m_pretrained_bnfrozen_r152_32x2x1_58e_kinetics400_rgb, Path('.'))
