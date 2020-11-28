@@ -11,7 +11,8 @@ from src.data import DatabaseHandle, VideoTransformation
 class HarDataset(Dataset):
     def __init__(self, database: DatabaseHandle, res: int, classes: [str], video_metadata: dict,
                  do_augmentation=False,
-                 num_frames=32, num_frames_per_sample=None, num_chunks=1, fps=15, limit_per_class=1000, clip_offset=None,
+                 num_frames=32, num_frames_per_sample=None, num_chunks=1, fps=15, limit_per_class=1000,
+                 clip_offset=None,
                  background_min_distance=3, period_max_distance=10, min_action_overlap=0.99, allow_critical=False,
                  num_workers=4, backend='av'):
         """
@@ -97,9 +98,12 @@ class HarDataset(Dataset):
             else:
                 self.x.append(idx)
                 y.append(vec)
-                video_id = curr_record['url'].split('v=')[1] if 'youtube' in curr_record['url'] else curr_record['url'].split('id=')[1]
+                video_id = curr_record['url'].split('v=')[1] if 'youtube' in curr_record['url'] else \
+                curr_record['url'].split('id=')[1]
                 sample_id = f"{key}@{start}-{end}"
-                self.info.append(dict(key=key, start=start, end=end, path=path, video=video_id, critical=critical, annotations=json, id=sample_id))
+                self.info.append(
+                    dict(key=key, start=start, end=end, path=path, video=video_id, critical=critical, annotations=json,
+                         id=sample_id))
                 self._id_2_index[sample_id] = len(self.info) - 1
 
         self.y = torch.stack(y)
@@ -178,16 +182,21 @@ class HarDataset(Dataset):
                 # sometimes the last frame of a clip gets lost. if so repeat last frame at the end
                 resampling_idx[resampling_idx >= len(frames)] = len(frames) - 1
             frames = frames[resampling_idx]
-            assert frames.shape[0] >= self.num_frames, f'resampled tensor on index={index} has only {frames.shape[0]} frames after resampling of {len(resampling_idx)} indices'
+            assert frames.shape[
+                       0] >= self.num_frames, f'resampled tensor on index={index} has only {frames.shape[0]} frames after resampling of {len(resampling_idx)} indices'
         else:
             clip_pts = self.video_clips.resampling_idxs[video_idx][clip_idx]
-            vr = de.VideoReader(video_path, num_threads=1) #, ctx=de.gpu())
+            vr = de.VideoReader(video_path, num_threads=1)  # , ctx=de.gpu())
             frames = vr.get_batch(clip_pts - clip_pts[0] + clip_idx)
             vr = None
             del vr
 
         # todo: run on gpu
-        frames = VideoTransformation(res=self.res if resize else 360, do_augmentation=self.do_augmentation)(frames)
+        # T, H, W, C -> T, C, H, W
+        frames = frames.permute((0, 3, 1, 2))
+        frames = VideoTransformation(res=self.res, do_augmentation=self.do_augmentation, pass_through=not resize)(frames)
+        # T, H, W, C -> C, T, H, W
+        frames = frames.permute((1, 0, 2, 3))
 
         # reshape if test loop from 4D to 5D (Chunks x C x T x H x W)
         frames = self._get_chunks(frames)
@@ -207,10 +216,10 @@ class HarDataset(Dataset):
             clip_offsets = (np.arange(self.num_chunks) * avg_interval).astype(np.int)
         else:
             print('cannot sample segments')
-            clip_offsets = np.zeros((self.num_chunks, ), dtype=np.int)
+            clip_offsets = np.zeros((self.num_chunks,), dtype=np.int)
         x = torch.stack([x[:, start:start + self.num_frames] for start in clip_offsets])
         assert x.shape[1] == 3
-        return x   # Chunks x C x T x S^2
+        return x  # Chunks x C x T x S^2
 
     def precompute_mean_and_std(self):
         mean_channel_1 = []

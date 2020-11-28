@@ -1,14 +1,14 @@
 import math
-import random
 import torch
-from torchvision.transforms import _functional_video as T
+from torchvision.transforms import Compose, ToTensor, RandomHorizontalFlip, CenterCrop, Resize, RandomResizedCrop, ColorJitter, Lambda
 
 
 class VideoTransformation(object):
 
-    def __init__(self, res=112, do_augmentation=False):
+    def __init__(self, res=112, do_augmentation=False, pass_through=False):
         self.res = res
         self.do_augmentation = do_augmentation
+        self.pass_through = pass_through
 
     def __call__(self, frames: torch.Tensor):
 
@@ -17,22 +17,25 @@ class VideoTransformation(object):
         num_frames = frames.shape[0]  # t x c x h x w
 
         # todo: use gpu-batch-transformations -> classifier
-        width = frames.shape[2]
-        height = frames.shape[1]
-        left = random.randint(0, math.floor(0.1 * width))
-        top = random.randint(0, math.floor(0.1 * height))
+        width = frames.shape[3]
+        height = frames.shape[2]
 
-        flip = random.random() > 0.5
-
-        frames = T.to_tensor(frames)
-        if self.do_augmentation:
-            if flip:
-                frames = T.hflip(frames)
-            # one of nearest, linear, bilinear, trilinear, area
-            frames = T.resized_crop(frames, top, left, math.floor(height * 0.9), math.floor(width * 0.9),
-                                    (self.res, self.res), 'area')
+        if self.do_augmentation and not self.pass_through:
+            transforms = Compose([
+                ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0),
+                RandomHorizontalFlip(),
+                RandomResizedCrop(size=(self.res, self.res), scale=(0.85, 1), ratio=(1.78, 1.78)),
+                Lambda(lambda data: data / 255.0)
+            ])
+        elif not self.pass_through:
+            transforms = Compose([
+                CenterCrop((math.floor(height * 0.9), math.floor(width * 0.9))),
+                Resize((self.res, self.res)),
+                Lambda(lambda data: data / 255.0)
+            ])
         else:
-            frames = T.center_crop(frames, (math.floor(height * 0.9), math.floor(width * 0.9)))
-            frames = T.resize(frames, (self.res, self.res), interpolation_mode='bilinear')
-
-        return frames
+            transforms = Compose([
+                Resize((self.res, self.res)),
+                Lambda(lambda data: data / 255.0)
+            ])
+        return transforms(frames)

@@ -183,7 +183,8 @@ class Classifier(LightningModule):
         self.log('train_batch_loss', batch_loss, prog_bar=True)
         self.log('train_batch_acc_micro', self.train_stat_scores.accuracy('micro'), prog_bar=True)
         self.log('train_batch_balanced_acc_micro', self.train_stat_scores.balanced_accuracy('micro'), prog_bar=True)
-        self.log('train_batch_balanced_acc_weighted', self.train_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
+        self.log('train_batch_balanced_acc_weighted', self.train_stat_scores.balanced_accuracy('weighted'),
+                 prog_bar=True)
 
         return {'losses': losses, 'meta': info, 'loss': batch_loss}
 
@@ -333,19 +334,19 @@ class Classifier(LightningModule):
     def load_weights(self):
         if self.hparams.pretrained_path and self.hparams.pretrained_path.exists():
             state = torch.load(str(self.hparams.pretrained_path))
-            if 'state_dict' in state:
-                state = state['state_dict']
 
             try:
                 self.load_state_dict(state['state_dict'], strict=True)
                 print('all weights loaded')
                 return True
-            except RuntimeError:
+            except RuntimeError as e:
                 pass
-            except KeyError:
+            except KeyError as e:
                 pass
 
             fc_layers = [f'cls_head.{name}' for name, param in self.backbone.groups[-1][0].named_parameters()]
+            if 'state_dict' in state:
+                state = state['state_dict']
             state = {k: v for k, v in state.items() if k not in fc_layers}
             try:
                 self.backbone.load_state_dict(state, strict=False)

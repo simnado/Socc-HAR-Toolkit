@@ -31,7 +31,9 @@ class X3D_S(X3D):
                 pretrained=None,
                 gamma_w=1,
                 gamma_b=2.25,
-                gamma_d=2.2
+                gamma_d=2.2,
+                norm_cfg=dict(type='BN3d', requires_grad=True),
+                norm_eval=False
             ),
             cls_head=dict(
                 type='X3DHead',
