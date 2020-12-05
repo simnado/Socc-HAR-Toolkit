@@ -61,7 +61,7 @@ class MultiLabelStatScores(Metric):
         return (sensitivity + specificity) / 2
 
     def accuracy(self, class_reduction: str):
-        return class_reduce(self.tp, self.sup, self.sup, class_reduction=class_reduction)
+        return class_reduce(self.tp + self.tn, self.tp + self.tn + self.fp + self.fn, self.sup, class_reduction=class_reduction)
 
     def precision(self, class_reduction: str):
         return class_reduce(self.tp, self.tp + self.fp, self.sup, class_reduction=class_reduction)
@@ -70,8 +70,8 @@ class MultiLabelStatScores(Metric):
         return class_reduce(self.tp, self.tp + self.fn, self.sup, class_reduction=class_reduction)
 
     def f1(self, class_reduction: str):
-        prec = self.precision(class_reduction)
-        rec = self.recall(class_reduction)
+        prec = self.precision('none' if class_reduction == 'macro' else class_reduction)
+        rec = self.recall('none' if class_reduction == 'macro' else class_reduction)
         beta = 1
         num = (1 + beta ** 2) * prec * rec
         denom = ((beta ** 2) * prec + rec)
