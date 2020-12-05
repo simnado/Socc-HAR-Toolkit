@@ -321,7 +321,7 @@ class Classifier(LightningModule):
     def lrs(self):
         if type(self.hparams.lr) == float:
             self.hparams.lr = [self.hparams.lr]
-        return np.linspace(self.hparams.lr[-1], self.hparams.lr[0], self.hparams.trainable_groups)
+        return np.geomspace(self.hparams.lr[-1], self.hparams.lr[0], self.hparams.trainable_groups)
 
     @property
     def accumulate_grad_batches(self):

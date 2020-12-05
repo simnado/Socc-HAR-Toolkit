@@ -50,6 +50,8 @@ class ReportEvaluationModule(EvaluationModule):
         if self.num_test_runs > 0:
             for index, row in df[df.subset == 'test'].sample(n=10).iterrows():
                 assert len(df[(df.key == row.key) & (df.start == row.start)]) == self.num_test_runs
+                # no test duplicates
+                assert len(df[(df.key == row.key) & (df.start == row.start) & (df.epoch == row.epoch)]) == 1
 
         # train is not deterministic
         occs = []
@@ -122,7 +124,7 @@ class ReportEvaluationModule(EvaluationModule):
         assert -1 < threshold < 101
         if self.test_scalars[threshold] is None:
             scalars = MultiLabelStatScores(self.dm.num_classes, threshold=threshold / 100.0)
-            scalars(self._get_scores('test', self.num_epochs - 1), self._get_y('test', self.num_epochs - 1))
+            scalars(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
             self.test_scalars[threshold] = scalars
 
     def _init_train_curve(self):
@@ -140,10 +142,12 @@ class ReportEvaluationModule(EvaluationModule):
     def _init_test_curve(self):
         if self.test_curve is None:
             curve = MultiLabelStatCurves(self.dm.num_classes)
-            curve(self._get_scores('test', self.num_epochs - 1), self._get_y('test', self.num_epochs - 1))
+            curve(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
             self.test_curve = curve
 
     def get_metric_by_epoch(self, metric: str, reduction: str, save=True, upload=False):
+        assert reduction in ['micro', 'macro', 'weighted']
+
         fig, ax = plt.subplots(dpi=120)
         ax.set_title(f'{reduction} {metric}')
 
@@ -160,6 +164,12 @@ class ReportEvaluationModule(EvaluationModule):
 
         plt.tight_layout()
         plt.close()
+        if upload:
+            self.logger.log_metrics({
+              f'train_{metric}_{reduction}': train[-1],
+              f'val_{metric}_{reduction}': val[-1]
+            })
+
         self._handle(fig, 'train', f'{reduction} {metric} while training', save, upload)
         return fig
 
@@ -176,8 +186,7 @@ class ReportEvaluationModule(EvaluationModule):
             self._init_test_curve()
             curve = self.test_curve
 
-        fpr, tpr, thresholds, peak_idx = getattr(curve, metric)(reductions, [self.dm.classes.index(cls) for cls in classes])
-
+        curves = getattr(curve, metric)(['micro', 'macro'], [i for i in range(len(self.dm.classes))])
         fig, ax = plt.subplots(dpi=120)
         ax.set_title(f'{metric}')
         ax.set_xlabel('false-positive rate (fpr)')
@@ -185,18 +194,31 @@ class ReportEvaluationModule(EvaluationModule):
 
         ax.plot([0,1], [0,1], linestyle='--')
 
-        labels = reductions + classes
+        labels = reductions + self.dm.classes
+        keys = reductions + [i for i in range(self.dm.num_classes)]
 
-        for line in range(len(fpr)):
-            color = next(ax._get_lines.prop_cycler)['color']
-            peak = peak_idx[line]
-            ax.plot(fpr[line], tpr[line], color=color, label=f'{labels[line]}: th = %0.2f' % thresholds[line][peak])
-            ax.plot(fpr[line][peak], tpr[line][peak], color=color, marker='o')
+        metrics = {}
+        for idx, key in enumerate(keys):
+            fpr, tpr, thresholds, peak = curves[key]
+            label = labels[idx]
+            threshold = thresholds[peak]
+            metrics[f'{split}_{metric}_threshold_{label}'] = threshold
+            if label in reductions or label in classes:
+                color = next(ax._get_lines.prop_cycler)['color']
+                linestyle = '-' if label in classes else ':'
+                label = (f'{label}: θ=%0.2f' % threshold) if label in classes else label
+                ax.plot(fpr, tpr, color=color, label=label, linestyle=linestyle)
+                ax.plot(fpr[peak], tpr[peak], color=color, marker='o')
 
         ax.legend()
 
         plt.tight_layout()
         plt.close()
+
+        print(metrics)
+
+        if upload == True:
+            self.logger.log_metrics(metrics)
         self._handle(fig, 'train', f'samples', save, upload)
         return fig
 
@@ -236,9 +258,9 @@ class ReportEvaluationModule(EvaluationModule):
                 f'{split}_balanced_accuracy_micro': scalars.balanced_accuracy('micro'),
                 f'{split}_balanced_accuracy_macro': scalars.balanced_accuracy('macro'),
                 f'{split}_balanced_accuracy_weighted': scalars.balanced_accuracy('weighted'),
-                f'{split}_accuracy_micro': scalars.balanced_accuracy('micro'),
-                f'{split}_accuracy_macro': scalars.balanced_accuracy('macro'),
-                f'{split}_accuracy_weighted': scalars.balanced_accuracy('weighted'),
+                f'{split}_accuracy_micro': scalars.accuracy('micro'),
+                f'{split}_accuracy_macro': scalars.accuracy('macro'),
+                f'{split}_accuracy_weighted': scalars.accuracy('weighted'),
                 f'{split}_f1_micro': scalars.f1('micro'),
                 f'{split}_f1_macro': scalars.f1('macro'),
                 f'{split}_f1_weighted': scalars.f1('weighted'),
@@ -262,11 +284,11 @@ class ReportEvaluationModule(EvaluationModule):
 
         plt.xticks(x, rotation=90)
         ax.set_xticklabels(labels)
-        ax.legend()
+        ax.legend(loc='best')
 
         plt.tight_layout()
         plt.close()
-        self._handle(fig, 'train', f'samples', save, upload)
+        self._handle(fig, 'train', f'scalars per subset', save, upload)
         return fig
 
     def get_scalar_by_class(self, split: str, metric: str, save=True, upload=False):
@@ -292,8 +314,8 @@ class ReportEvaluationModule(EvaluationModule):
             curve = self.test_curve
             scalars = self.test_scalars[50]
 
-        metric = getattr(scalars, metric) if metric != 'auroc' else curve.auroc
-        scalars = metric('none')
+        metric_fn = getattr(scalars, metric) if metric != 'auroc' else curve.auroc
+        scalars = metric_fn('none')
         order = torch.argsort(torch.Tensor(scalars)).tolist()
         metrics = dict()
 
@@ -346,8 +368,13 @@ class ReportEvaluationModule(EvaluationModule):
 
     @property
     def num_epochs(self):
-        return self.report.epoch.nunique()
+        df = self.report
+        return df[df.subset == 'train'].epoch.nunique()
 
     @property
     def num_test_runs(self):
         return self.report[self.report.subset == 'test'].epoch.nunique()
+
+    @property
+    def last_test_epoch(self):
+        return self.report[self.report.subset == 'test'].epoch.max()

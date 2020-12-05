@@ -49,32 +49,35 @@ class MultiLabelStatCurves(Metric):
         return self.sup.sum()
 
     def roc(self, class_reduction: [str], class_idxs: [int]):
+        curves = dict()
         fpr = []
         tpr = []
-        thresholds = []
-        peak_idxs = []
 
         if 'micro' in class_reduction:
             targets = torch.flatten(self.target)
             scores = torch.flatten(self.scores)
             fpr_m, tpr_m, thresholds_m = roc_curve(targets, scores)
-
-            fpr.append(fpr_m)
-            tpr.append(tpr_m)
-            thresholds.append(thresholds_m)
-            peak_idxs.append(np.argmax(tpr_m - fpr_m))
+            curves['micro'] = (fpr_m, tpr_m, thresholds_m, np.argmax(tpr_m - fpr_m))
         for i in class_idxs:
             fpr_c, tpr_c, thresholds_c = roc_curve(self.target[:, i], self.scores[:, i])
+            curves[i] = (fpr_c, tpr_c, thresholds_c, np.argmax(tpr_c - fpr_c))
             fpr.append(fpr_c)
             tpr.append(tpr_c)
-            thresholds.append(thresholds_c)
-
-            peak_idxs.append(np.argmax(tpr_c - fpr_c))
         if 'macro' in class_reduction:
-            # todo:
-            pass
+            all_fpr = np.unique(np.concatenate(fpr))
 
-        return fpr, tpr, thresholds, peak_idxs
+            # Then interpolate all ROC curves at this points
+            mean_tpr = np.zeros_like(all_fpr)
+            for i in range(self.num_classes):
+                mean_tpr += np.interp(all_fpr, fpr[i], tpr[i])
+
+            # Finally average it and compute AUC
+            mean_tpr /= self.num_classes
+            fpr_macro = all_fpr
+            tpr_macro = mean_tpr
+            curves['macro'] = (fpr_macro, tpr_macro, [0 for _ in fpr_macro], np.argmax(tpr_macro - fpr_macro))
+
+        return curves
 
     def auroc(self, class_reduction: str):
 
