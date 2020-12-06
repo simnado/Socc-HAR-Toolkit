@@ -28,6 +28,6 @@ class PlotIterator(object):
         else:
             # row = self.order[self.pointer]
             row = self.indices[self.pointer]
-            plot = ClipPlot(self.logger, dataset=self.dataset, context=self.context, row=row, pred=self.pred, save_dir=self.save_dir)
+            plot = ClipPlot(self.logger, dataset=self.dataset, context=self.context, row=row, pred=self.pred[self.pointer], save_dir=self.save_dir)
             self.pointer += 1
             return plot

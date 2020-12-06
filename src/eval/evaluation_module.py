@@ -148,7 +148,7 @@ class EvaluationModule:
         dataset = self.dm.datasets[context]
         stats = self.dm.stats[context]
 
-        if pred:
+        if pred is not None:
             assert indices and len(pred) == len(indices), 'length of `pred` has to match length of `indices`'
 
         if not indices:

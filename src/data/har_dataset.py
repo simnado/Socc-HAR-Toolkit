@@ -11,7 +11,7 @@ from src.data import DatabaseHandle, VideoTransformation
 class HarDataset(Dataset):
     def __init__(self, database: DatabaseHandle, res: int, classes: [str], video_metadata: dict,
                  do_augmentation=False,
-                 num_frames=32, num_frames_per_sample=None, num_chunks=1, fps=15, limit_per_class=1000,
+                 num_frames=32, num_frames_per_sample=None, num_chunks=1, fps=15,
                  clip_offset=None,
                  background_min_distance=3, period_max_distance=10, min_action_overlap=0.99, allow_critical=False,
                  num_workers=4, backend='av'):
@@ -39,7 +39,6 @@ class HarDataset(Dataset):
             self.num_frames_per_sample = num_frames
         self.num_chunks = num_chunks
         self.res = res
-        self._limit_per_class = limit_per_class
         self.fps = fps
         self.duration = self.num_frames_per_sample / self.fps
         self.clip_offset = clip_offset
@@ -100,7 +99,7 @@ class HarDataset(Dataset):
                 y.append(vec)
                 video_id = curr_record['url'].split('v=')[1] if 'youtube' in curr_record['url'] else \
                 curr_record['url'].split('id=')[1]
-                sample_id = f"{key}@{start}-{end}"
+                sample_id = f"{key}@{start:.2f}"
                 self.info.append(
                     dict(key=key, start=start, end=end, path=path, video=video_id, critical=critical, annotations=json,
                          id=sample_id))
@@ -149,6 +148,10 @@ class HarDataset(Dataset):
     @staticmethod
     def overlap(a: [int], b: [int]):
         return max(0, min(a[1], b[1]) - max(a[0], b[0]))
+
+    def get_row(self, key, start):
+        sample_id = f"{key}@{start:.2f}"
+        return self._id_2_index[sample_id]
 
     def __getitem__(self, index):
         x = self.get_tensor(index)

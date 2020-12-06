@@ -10,7 +10,8 @@ from src.eval import OutDir, ClipPlot, PlotIterator, EvaluationModule, MultiLabe
 
 class ReportEvaluationModule(EvaluationModule):
 
-    def __init__(self, out_dir: str, data_module: DataModule, report: pd.DataFrame, logger, img_format='eps', consensus='max'):
+    def __init__(self, out_dir: str, data_module: DataModule, report: pd.DataFrame, logger, img_format='eps',
+                 consensus='max'):
         super().__init__(out_dir, data_module, logger, img_format)
 
         assert consensus in ['max', 'avg']
@@ -25,23 +26,62 @@ class ReportEvaluationModule(EvaluationModule):
         self.val_curve: Optional[MultiLabelStatCurves] = None
         self.test_curve: Optional[MultiLabelStatCurves] = None
 
-    def get_sample_plot_by_report(self, context='train', epoch=None):
+    def get_sample_plot_by_report(self, context='train', label=None, epoch=None):
         if epoch is None:
             epoch = self.num_epochs - 1
 
-        df = self.report
-        sample = df[(df.subset == context) & (df.epoch == epoch)].sample()
+        if context == 'test':
+            df = self.test_df
+            epoch = self.last_test_epoch
+        else:
+            df = self.report
+
+        df = df[(df.subset == context) & (df.epoch == epoch)]
+
+        if label is not None:
+            df = df[df.labels.str.contains(label, na=False)]
+
+        sample = df.sample()
+
+        print(f'{sample.key.item()}@{sample.start.item()} - {sample.labels.item()}')
 
         # todo: context=all
-        paths = [path for path in self.dm.datasets[context].video_metadata['video_paths'] if sample.video.item() in path]
+        print(context)
+        dataset_idx = self.dm.datasets[context].get_row(sample.key.item(), sample.start.item())
 
         preds = np.fromstring(sample.scores.item()[1:-1], dtype=float, sep=', ')
         preds = torch.from_numpy(preds)
-        return self.get_sample_plot(video=Path(paths[0]), offset=sample.start.item(), pred=preds)
+        return self.get_sample_plot(row=dataset_idx, context=context, pred=preds)
 
     def get_top_loss_plots(self, context='train', epoch=None, limit=50):
-        # todo:
-        return self.get_sample_plots(indices=[], pred=None, context=context)
+        if epoch is None:
+            epoch = self.num_epochs - 1
+
+        if context == 'test':
+            df = self.test_df
+            epoch = self.last_test_epoch
+        else:
+            df = self.report
+
+        df = df[(df.subset == context) & (df.epoch == epoch)].sort_values(by=['loss'], ascending=False).head(50)
+        rows = []
+        pred = []
+
+        for i in range(limit):
+            sample = df.iloc[i]
+            try:
+                dataset_idx = self.dm.datasets[context].get_row(sample.key, sample.start)
+                rows.append(dataset_idx)
+            except KeyError as e:
+                print(f'Error: {str(e)}')
+                continue
+
+            preds = np.fromstring(sample.scores[1:-1], dtype=float, sep=', ')
+            preds = torch.from_numpy(preds)
+            pred.append(preds)
+
+        pred = torch.stack(pred, dim=0)
+        return self.get_sample_plots(indices=rows, pred=pred, context=context, label=None)
 
     def integrity_check(self) -> bool:
         df = self.report
@@ -55,7 +95,8 @@ class ReportEvaluationModule(EvaluationModule):
             for index, row in self.test_df.sample(n=10).iterrows():
                 assert len(self.test_df[(self.test_df.key == row.key) & (self.test_df.start == row.start)]) == 1
                 # no test duplicates
-                assert len(self.test_df[(self.test_df.key == row.key) & (self.test_df.start == row.start) & (self.test_df.epoch == row.epoch)]) == 1
+                assert len(self.test_df[(self.test_df.key == row.key) & (self.test_df.start == row.start) & (
+                            self.test_df.epoch == row.epoch)]) == 1
 
         # train is not deterministic
         occs = []
@@ -107,7 +148,8 @@ class ReportEvaluationModule(EvaluationModule):
 
         ax.set_title(f'train samples per epoch')
 
-        occs = [[self._label_occurances('train', epoch, label) for epoch in range(self.num_epochs)] for label in self.dm.classes]
+        occs = [[self._label_occurances('train', epoch, label) for epoch in range(self.num_epochs)] for label in
+                self.dm.classes]
         occs = occs + [[self._background_occurances('train', epoch) for epoch in range(self.num_epochs)]]
 
         ax.hlines(self.dm.limit_per_class['train'], -0.5, 33.5, color='grey')
@@ -176,8 +218,8 @@ class ReportEvaluationModule(EvaluationModule):
         plt.close()
         if upload:
             self.logger.log_metrics({
-              f'train_{metric}_{reduction}': train[-1],
-              f'val_{metric}_{reduction}': val[-1]
+                f'train_{metric}_{reduction}': train[-1],
+                f'val_{metric}_{reduction}': val[-1]
             })
 
         self._handle(fig, 'train', f'{reduction} {metric} while training', save, upload)
@@ -202,7 +244,7 @@ class ReportEvaluationModule(EvaluationModule):
         ax.set_xlabel('false-positive rate (fpr)')
         ax.set_ylabel('true-positive rate (tpr)')
 
-        ax.plot([0,1], [0,1], linestyle='--')
+        ax.plot([0, 1], [0, 1], linestyle='--')
 
         labels = reductions + self.dm.classes
         keys = reductions + [i for i in range(self.dm.num_classes)]
@@ -285,7 +327,7 @@ class ReportEvaluationModule(EvaluationModule):
                 f'{split}_auroc_weighted': curve.auroc('macro'),
             }
 
-            labels = [key[len(split)+1:] for key, value in metrics.items()]
+            labels = [key[len(split) + 1:] for key, value in metrics.items()]
             values = [value for key, value in metrics.items()]
             ax.bar(x + (idx - 1.5) * width / 3, values, width / 3, label=split)
 
