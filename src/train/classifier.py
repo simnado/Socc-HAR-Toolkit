@@ -148,7 +148,7 @@ class Classifier(LightningModule):
                 'monitor': 'val_loss'
             }
         elif self.hparams.scheduler == 'cycle':
-            total_steps = math.ceil(self.hparams.epochs * self.train_iterations / self.accumulate_grad_batches)
+            total_steps = math.ceil(self.hparams.epochs * self.train_iterations / self.accumulate_grad_batches / 64) * 64
             lr_scheduler = OneCycleLR(optimizer, max_lr=max_lrs, div_factor=10, total_steps=total_steps,
                                       pct_start=0.25, verbose=False)
             lr_scheduler = {
