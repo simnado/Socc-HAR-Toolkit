@@ -170,7 +170,7 @@ class EvaluationModule:
         now = datetime.now()
         filename = f'{self.out_dir.stats()}/{type}_{context}_{now.strftime("%Y%m-%d%H-%M%S")}.{self.file_format}'
         if save:
-            fig.savefig(filename, format=self.file_format)
+            fig.savefig(filename, format=self.file_format, bbox_inches='tight')
         if upload:
             with self.logger.experiment.context_manager(context):
                 self.logger.experiment.log_asset(filename)

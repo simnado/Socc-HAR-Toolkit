@@ -10,9 +10,13 @@ from src.eval import OutDir, ClipPlot, PlotIterator, EvaluationModule, MultiLabe
 
 class ReportEvaluationModule(EvaluationModule):
 
-    def __init__(self, out_dir: str, data_module: DataModule, report: pd.DataFrame, logger, img_format='eps'):
+    def __init__(self, out_dir: str, data_module: DataModule, report: pd.DataFrame, logger, img_format='eps', consensus='max'):
         super().__init__(out_dir, data_module, logger, img_format)
+
+        assert consensus in ['max', 'avg']
+
         self.report = report
+        self.consensus = consensus
         self.train_scalars: [MultiLabelStatScores] = [None for _ in range(self.num_epochs)]
         self.val_scalars: [MultiLabelStatScores] = [None for _ in range(self.num_epochs)]
         self.test_scalars: [MultiLabelStatScores] = [None for _ in range(100)]
@@ -48,10 +52,10 @@ class ReportEvaluationModule(EvaluationModule):
 
         # test is deterministic
         if self.num_test_runs > 0:
-            for index, row in df[df.subset == 'test'].sample(n=10).iterrows():
-                assert len(df[(df.key == row.key) & (df.start == row.start)]) == self.num_test_runs
+            for index, row in self.test_df.sample(n=10).iterrows():
+                assert len(self.test_df[(self.test_df.key == row.key) & (self.test_df.start == row.start)]) == 1
                 # no test duplicates
-                assert len(df[(df.key == row.key) & (df.start == row.start) & (df.epoch == row.epoch)]) == 1
+                assert len(self.test_df[(self.test_df.key == row.key) & (self.test_df.start == row.start) & (self.test_df.epoch == row.epoch)]) == 1
 
         # train is not deterministic
         occs = []
@@ -75,16 +79,22 @@ class ReportEvaluationModule(EvaluationModule):
         return len(df[(df.subset == split) & (df.epoch == epoch) & (df.labels.str.contains('nan', na=True))])
 
     def _get_y(self, split: str, epoch: int):
-        df = self.report
-        df = df[(df.subset == split) & (df.epoch == epoch)]
+        if split == 'test':
+            df = self.test_df
+        else:
+            df = self.report
+            df = df[(df.subset == split) & (df.epoch == epoch)]
         y = df.y.tolist()
         y = [np.fromstring(score[1:-1], sep=', ') for score in y]
         y = torch.Tensor(y)
         return y
 
     def _get_scores(self, split: str, epoch: int):
-        df = self.report
-        df = df[(df.subset == split) & (df.epoch == epoch)]
+        if split == 'test':
+            df = self.test_df
+        else:
+            df = self.report
+            df = df[(df.subset == split) & (df.epoch == epoch)]
         out = df.scores.tolist()
         out = [np.fromstring(score[1:-1], sep=', ') for score in out]
         out = torch.Tensor(out)
@@ -358,13 +368,63 @@ class ReportEvaluationModule(EvaluationModule):
         ax.plot(x[peak], metrics[peak], color=color, marker='o')
 
         if upload:
-            # todo: move to _handle()
             self.logger.log_metrics({f'threshold_by_{metric}_{reduction}': x[peak]})
 
         plt.tight_layout()
         plt.close()
         self._handle(fig, split, f'threshold by {reduction} {metric}', save, upload)
         return fig
+
+    def get_metrics_by_consensus(self, save=True, upload=False):
+        fig, ax = plt.subplots(dpi=120)
+
+        stored_consensus = self.consensus
+        metrics = dict()
+
+        self.consensus = 'max'
+        curve = MultiLabelStatCurves(self.dm.num_classes)
+        curve(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
+        scalars = MultiLabelStatScores(self.dm.num_classes, threshold=50 / 100.0)
+        scalars(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
+        metrics['max'] = {
+            f'test_balanced_accuracy_macro_{self.consensus}_consensus': float(scalars.balanced_accuracy('macro')),
+            f'test_accuracy_macro_{self.consensus}_consensus': float(scalars.accuracy('macro')),
+            f'test_f1_macro_{self.consensus}_consensus': float(scalars.f1('macro')),
+            f'test_precision_macro_{self.consensus}_consensus': float(scalars.precision('macro')),
+            f'test_recall_macro_{self.consensus}_consensus': float(scalars.recall('macro')),
+            f'test_auroc_macro_{self.consensus}_consensus': curve.auroc('macro'),
+        }
+
+        self.consensus = 'avg'
+        curve = MultiLabelStatCurves(self.dm.num_classes)
+        curve(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
+        scalars = MultiLabelStatScores(self.dm.num_classes, threshold=50 / 100.0)
+        scalars(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
+        metrics['avg'] = {
+            f'test_balanced_accuracy_macro_{self.consensus}_consensus': float(scalars.balanced_accuracy('macro')),
+            f'test_accuracy_macro_{self.consensus}_consensus': float(scalars.accuracy('macro')),
+            f'test_f1_macro_{self.consensus}_consensus': float(scalars.f1('macro')),
+            f'test_precision_macro_{self.consensus}_consensus': float(scalars.precision('macro')),
+            f'test_recall_macro_{self.consensus}_consensus': float(scalars.recall('macro')),
+            f'test_auroc_macro_{self.consensus}_consensus': curve.auroc('macro'),
+        }
+
+        self.consensus = stored_consensus
+
+        max = [v for k, v in metrics['max'].items()]
+        avg = [v for k, v in metrics['avg'].items()]
+
+        index = ['balanced accuracy', 'accuracy', 'f1',
+                 'precision', 'recall', 'auroc']
+        df = pd.DataFrame({'max': max,
+                           'avg': avg}, index=index)
+        df.plot.barh(stacked=False, title='consensus functions', ax=ax, ylabel='macro')
+
+        if upload:
+            self.logger.log_metrics(metrics['max'])
+            self.logger.log_metrics(metrics['avg'])
+
+        self._handle(fig, 'test', f'metrics by consensus', save, upload)
 
     @property
     def num_epochs(self):
@@ -373,8 +433,22 @@ class ReportEvaluationModule(EvaluationModule):
 
     @property
     def num_test_runs(self):
+        df = self.report
+        df = df[df.subset == 'test']
+        duplicates = df.duplicated(subset=['subset', 'key', 'start']).sum() > 0
+        if duplicates == True:
+            return 2
         return self.report[self.report.subset == 'test'].epoch.nunique()
 
     @property
     def last_test_epoch(self):
         return self.report[self.report.subset == 'test'].epoch.max()
+
+    @property
+    def test_df(self):
+        df = self.report
+        df = df[df.subset == 'test']
+        if self.consensus == 'max':
+            return df.drop_duplicates(subset=['subset', 'key', 'start'], keep='first')
+        elif self.consensus == 'avg':
+            return df.drop_duplicates(subset=['subset', 'key', 'start'], keep='last')

@@ -20,7 +20,7 @@ class Classifier(LightningModule):
                  mean: [float], std: [float],
                  train_samples: int, pretrained_path: Path,
                  num_frames: int, res: int, fps: int, consensus='max',
-                 trainable_groups=None, patience=5,
+                 trainable_groups=None,
                  **kwargs):
 
         assert consensus in ['avg', 'max']
@@ -28,7 +28,7 @@ class Classifier(LightningModule):
         super().__init__()
         self.save_hyperparameters('lr', 'weight_decay', 'epochs', 'scheduler', 'optim', 'batch_size',
                                   'num_frames', 'res', 'fps', 'consensus',
-                                  'patience', 'trainable_groups',
+                                  'trainable_groups',
                                   'pretrained_path', 'mean', 'std')
         self.backbone = backbone
         self.hparams.name = self.backbone.__class__.__name__
@@ -181,10 +181,8 @@ class Classifier(LightningModule):
 
         self.log('train_max_score', scores.max())
         self.log('train_batch_loss', batch_loss, prog_bar=True)
-        self.log('train_batch_acc_micro', self.train_stat_scores.accuracy('micro'), prog_bar=True)
-        self.log('train_batch_balanced_acc_micro', self.train_stat_scores.balanced_accuracy('micro'), prog_bar=True)
-        self.log('train_batch_balanced_acc_weighted', self.train_stat_scores.balanced_accuracy('weighted'),
-                 prog_bar=True)
+        self.log('train_batch_f1_macro', self.train_stat_scores.f1('macro'), prog_bar=True)
+        self.log('train_batch_balanced_acc_macro', self.train_stat_scores.balanced_accuracy('macro'), prog_bar=True)
 
         return {'losses': losses, 'meta': info, 'loss': batch_loss}
 
@@ -195,9 +193,9 @@ class Classifier(LightningModule):
 
         self.log('train_precision_macro', self.train_stat_scores.precision('macro'))
         self.log('train_recall_macro', self.train_stat_scores.recall('macro'))
-        self.log('train_balanced_acc_weighted', self.train_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
+        self.log('train_f1_macro', self.train_stat_scores.f1('macro'))
         self.log('train_balanced_acc_macro', self.train_stat_scores.balanced_accuracy('macro'), prog_bar=True)
-        self.log('train_balanced_acc_micro', self.train_stat_scores.balanced_accuracy('micro'))
+        self.log('train_acc_macro', self.train_stat_scores.accuracy('macro'))
         self.log('train_hamming_loss', self.train_stat_scores.hamming_loss())
         self.log('train_time', train_time, on_epoch=True)
 
@@ -219,17 +217,12 @@ class Classifier(LightningModule):
         losses = self.reportLoss(out, y)
         losses = torch.mean(losses, dim=1)  # reduce per sample
 
-        batch_loss = losses.mean()
         scores = torch.sigmoid(out)
 
         self.val_stat_scores(scores, y)
         self.val_stat_curves(scores, y)
 
         self.log('val_max_score', scores.max())
-        self.log('val_batch_loss', batch_loss, prog_bar=True)
-        self.log('val_batch_acc_micro', self.val_stat_scores.accuracy('micro'))
-        self.log('val_batch_balanced_acc_micro', self.val_stat_scores.balanced_accuracy('micro'))
-        self.log('val_batch_balanced_acc_weighted', self.val_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
 
         return {'losses': losses, 'meta': info}
 
@@ -239,9 +232,9 @@ class Classifier(LightningModule):
 
         self.log('val_precision_macro', self.val_stat_scores.precision('macro'))
         self.log('val_recall_macro', self.val_stat_scores.recall('macro'))
+        self.log('val_f1_macro', self.val_stat_scores.f1('macro'))
         self.log('val_balanced_acc_macro', self.val_stat_scores.balanced_accuracy('macro'), prog_bar=True)
-        self.log('val_balanced_acc_weighted', self.val_stat_scores.balanced_accuracy('weighted'))
-        self.log('val_balanced_acc_micro', self.val_stat_scores.balanced_accuracy('micro'))
+        self.log('val_acc_macro', self.val_stat_scores.accuracy('macro'))
         self.log('val_hamming_loss', self.val_stat_scores.hamming_loss())
 
         self.log('val_loss', torch.cat(outputs['losses'], dim=0).mean())
@@ -262,24 +255,18 @@ class Classifier(LightningModule):
         losses = self.reportLoss(out, y)
         losses = torch.mean(losses, dim=1)  # reduce per sample
 
-        batch_loss = losses.mean()
         scores = torch.sigmoid(out)
 
         self.test_stat_scores(scores, y)
         self.test_stat_curves(scores, y)
 
         self.log('test_max_score', scores.max())
-        self.log('test_batch_loss', batch_loss, prog_bar=True)
-        self.log('test_batch_acc_micro', self.test_stat_scores.accuracy('micro'))
-        self.log('test_batch_balanced_acc_micro', self.test_stat_scores.balanced_accuracy('micro'))
-        self.log('test_batch_balanced_acc_weighted', self.test_stat_scores.balanced_accuracy('weighted'), prog_bar=True)
 
         return {'losses': losses, 'meta': info}
 
     def test_epoch_end(self, outputs):
 
         outputs = {k: [dic[k] for dic in outputs] for k in outputs[0]}
-
         self.log('test_loss', torch.cat(outputs['losses'], dim=0).mean())
 
     def count_parameters(self):
