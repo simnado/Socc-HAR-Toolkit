@@ -55,10 +55,10 @@ class DataModule(LightningDataModule):
         self.video_metadata = None
         self.pre_processor = None
 
-    def prepare_data(self):
+    def prepare_data(self, verbose=False):
         self.pre_processor = PreProcessing(self.database, self.media_dir.root, Path(self.precomputed_metadata_file),
                                            res=360)
-        self.video_metadata = self.pre_processor.prepare_data()
+        self.video_metadata = self.pre_processor.prepare_data(verbose)
 
         fps = self.video_metadata['train']['video_fps'] + self.video_metadata['val']['video_fps'] + self.video_metadata['test']['video_fps']
         invalid_frame_rates = [idx for idx, fps in enumerate(fps) if fps < self.fps]

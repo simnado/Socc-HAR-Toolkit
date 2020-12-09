@@ -1,14 +1,13 @@
 from pathlib import Path
+from typing import Optional
 from pytorch_lightning import Callback
 import torch
 import pandas as pd
 
-from src.eval import MultiLabelStatCurves
-
 
 class Reporter(Callback):
 
-    def __init__(self, out_dir: Path, classes: [str]):
+    def __init__(self, out_dir: Path, classes: [str], df: Optional[pd.DataFrame]):
         """
         Args:
             out_dir: Path
@@ -23,11 +22,11 @@ class Reporter(Callback):
         self.val_data = None
         self.test_data = None
 
-        self.df = pd.DataFrame(
-            columns=['subset', 'key', 'video', 'start', 'end', 'labels', 'critical', 'epoch', 'index', 'y', 'scores',
-                     'loss'])
-
-        self.report_file = self.out_dir.joinpath('report.csv')
+        self.df = df
+        if df is None:
+            self.df = pd.DataFrame(
+                columns=['subset', 'key', 'video', 'start', 'end', 'labels', 'critical', 'epoch', 'index', 'y', 'scores',
+                         'loss'])
 
     def on_fit_start(self, trainer, pl_module):
         #self.df = pd.DataFrame(
@@ -94,3 +93,8 @@ class Reporter(Callback):
     def push(data: dict, out):
         data['losses'] = torch.cat([data['losses'], out['losses']], dim=0)
         data['meta'] += out['meta']
+
+    @property
+    def report_file(self) -> Path:
+        # todo: save in `epoch=x.csv`
+        return self.out_dir.joinpath('report.csv')

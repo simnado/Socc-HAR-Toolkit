@@ -295,7 +295,6 @@ class Classifier(LightningModule):
 
         self.freeze()
 
-        print('unfreezed layers: ')
         for layer in list(itertools.chain(*self.trainable_layers)):
             for name, param in layer.named_parameters():
                 param.requires_grad = True

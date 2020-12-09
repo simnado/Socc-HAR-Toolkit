@@ -32,7 +32,7 @@ class PreProcessing:
             self._precomputed_video_metadata = torch.load(metadata_path)
             print(f'found precomputed video metadata.')
 
-    def prepare_data(self):
+    def prepare_data(self, verbose: bool):
         video_metadata = dict(
             train=dict(video_paths=[], video_fps=[], video_pts=[], sac_urls=[], sac_keys=[]),
             val=dict(video_paths=[], video_fps=[], video_pts=[], sac_urls=[], sac_keys=[]),
@@ -50,7 +50,8 @@ class PreProcessing:
                 index = video_metadata[split]['sac_urls'].index(url)
                 video_metadata[split]['sac_keys'][index] = list(
                     {*video_metadata[split]['sac_keys'][index], key})
-                print(f'[{key}] already processed')
+                if verbose:
+                    print(f'[{key}] already processed')
                 self.not_found.discard(url)
                 continue
 
@@ -58,7 +59,8 @@ class PreProcessing:
 
             # 1) Download from provider
             if not out_path.exists():
-                print(f'[{key}] load video {url}')
+                if verbose:
+                    print(f'[{key}] load video {url}')
 
                 raw_path = self.fetch.load_video(url, out_path.parent, self.res)
                 if not raw_path:
@@ -68,20 +70,23 @@ class PreProcessing:
 
             # 2) Convert
             if not out_path.exists() and raw_path:
-                print(f'[{key}] convert video {raw_path}')
+                if verbose:
+                    print(f'[{key}] convert video {raw_path}')
                 status = self.convert.resize_videos(Path(raw_path), dest_path=out_path, res=self.res)
                 if status != 0:
                     print(f'[{key}] ERROR! Converting failed!')
                     continue
-            else:
+            elif verbose:
                 print(f'[{key}] file ok {out_path}')
 
             # 3) Analyse
             if url not in self._precomputed_video_metadata[split]['sac_urls']:
-                print(f'[{key}] analyse video {out_path}')
+                if verbose:
+                    print(f'[{key}] analyse video {out_path}')
                 fps, pts = self.fetch.load_timestamps(out_path)
             else:
-                print(f'[{key}] found metadata')
+                if verbose:
+                    print(f'[{key}] found metadata')
                 old_idx = self._precomputed_video_metadata[split]['sac_urls'].index(url)
                 fps = self._precomputed_video_metadata[split]['video_fps'][old_idx]
                 pts = self._precomputed_video_metadata[split]['video_pts'][old_idx]
@@ -101,7 +106,8 @@ class PreProcessing:
 
             # 4) Delete Download
             if raw_path and raw_path.exists() and f'{self.res}p' not in raw_path.name:
-                print(f'[{key}] free storage for {raw_path}')
+                if verbose:
+                    print(f'[{key}] free storage for {raw_path}')
                 raw_path.unlink()
 
             self.video_metadata = video_metadata
