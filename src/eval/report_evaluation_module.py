@@ -283,12 +283,9 @@ class ReportEvaluationModule(EvaluationModule):
         scalars: Optional[MultiLabelStatScores] = None
         curve: Optional[MultiLabelStatCurves] = None
         fig, ax = plt.subplots(dpi=120)
-        ax.set_title(f'scalar metrics by subset')
 
         labels = []
-        width = 0.35  # the width of the bars
-
-        x = np.arange(18)  # the label locations
+        values = dict()
 
         for idx, split in enumerate(splits):
             if split == 'train':
@@ -328,15 +325,16 @@ class ReportEvaluationModule(EvaluationModule):
             }
 
             labels = [key[len(split) + 1:] for key, value in metrics.items()]
-            values = [value for key, value in metrics.items()]
-            ax.bar(x + (idx - 1.5) * width / 3, values, width / 3, label=split)
+            values[split] = [float(value) for key, value in metrics.items()]
 
             if upload:
                 self.logger.log_metrics(metrics)
 
-        plt.xticks(x, rotation=90)
-        ax.set_xticklabels(labels)
-        ax.legend(loc='best')
+        df = pd.DataFrame({'train': values['train'],
+                           'val': values['val'],
+                           'test': values['test']
+                           }, index=labels)
+        df.plot.barh(stacked=False, title='scalar metrics by subset', ax=ax)
 
         plt.tight_layout()
         plt.close()
@@ -348,7 +346,6 @@ class ReportEvaluationModule(EvaluationModule):
         curve: Optional[MultiLabelStatCurves] = None
         fig, ax = plt.subplots(dpi=120)
         title = f'{metric} by class'
-        ax.set_title(title)
 
         if split == 'train':
             self._init_train_curve()
@@ -368,22 +365,20 @@ class ReportEvaluationModule(EvaluationModule):
 
         metric_fn = getattr(scalars, metric) if metric != 'auroc' else curve.auroc
         scalars = metric_fn('none')
-        order = torch.argsort(torch.Tensor(scalars)).tolist()
+        order = torch.argsort(torch.Tensor(scalars), descending=False).tolist()
         metrics = dict()
 
         for idx in order:
             cls = self.dm.classes[idx]
             metrics[f'{split}_{metric}_{cls}'] = scalars[idx]
 
-        values = [value for key, value in metrics.items()]
+        values = [float(value) for key, value in metrics.items()]
         classes = [self.dm.classes[idx] for idx in order]
-        ax.bar(classes, values)
+        df = pd.DataFrame({split: values}, index=classes)
+        df.plot.barh(stacked=False, title=title, ax=ax, legend=False)
 
         if upload:
             self.logger.log_metrics(metrics)
-
-        plt.xticks(classes, rotation=90)
-        ax.set_xticklabels(classes)
 
         plt.tight_layout()
         plt.close()

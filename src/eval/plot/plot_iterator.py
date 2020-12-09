@@ -1,10 +1,8 @@
 from typing import Optional
 import torch
-from IPython.core.display import HTML, Video
 from pytorch_lightning.loggers import LightningLoggerBase
 from src.data import HarDataset
 from src.eval.plot import ClipPlot
-from pathlib import Path
 
 
 class PlotIterator(object):
