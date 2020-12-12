@@ -1,6 +1,7 @@
 import random
 from typing import Optional, List
 from matplotlib import pyplot as plt
+import pandas as pd
 from pathlib import Path
 import torch
 from datetime import datetime
@@ -22,7 +23,7 @@ class EvaluationModule:
     def plot_background_ratio(self, context='all', save=False, upload=False):
         assert context in ['train', 'val', 'test', 'all']
 
-        fig, ax1 = plt.subplots()
+        fig, ax1 = plt.subplots(dpi=400)
 
         if context != 'all':
             bg_ratio = self.dm.stats[context].background_ratio
@@ -48,37 +49,39 @@ class EvaluationModule:
 
         return fig
 
-    def plot_distribution(self, show='annotations', context='all', save=False, upload=False):
+    def plot_distribution(self, context='all', save=False, upload=False):
         assert context in ['train', 'val', 'test', 'all']
 
-        assert show in ['annotations', 'used_samples']
-
-        fig, ax = plt.subplots(dpi=120)
+        fig, ax = plt.subplots()
 
         if context != 'all':
-            actions = self.dm.stats[context].actions
-            samples = self.dm.stats[context].samples
+            actions = self.dm.stats[context].actions + [0]
+            samples = self.dm.stats[context].samples + [self.dm.stats[context].background_samples]
             resamples = self.dm.stats[context].resamples.tolist() + [self.dm.stats[context].background_resamples]
         else:
             actions = torch.sum(torch.tensor([self.dm.stats[context].actions for context in ['train', 'val', 'test']]), dim=0)
             samples = torch.sum(torch.tensor([self.dm.stats[context].samples for context in ['train', 'val', 'test']]), dim=0)
             resamples = torch.sum(torch.stack([self.dm.stats[context].resamples + [self.dm.stats[context].background_resamples] for context in ['train', 'val', 'test']]), dim=0)
 
-        plt.xticks(rotation=90)
-        ax.bar(self.dm.classes, samples, label='samples')
-        if context in ['train', 'val', 'test'] and show == 'used_samples':
-            ax.bar(self.dm.classes + ['background'], resamples, label='used samples')
-        if show == 'annotations':
-            ax.bar(self.dm.classes, actions, label='annotations')
+        if context == 'test':
+            resamples = samples
+
+        labels = self.dm.classes + ['background']
+        order = torch.argsort(torch.Tensor(samples), descending=False).tolist()
+        df = pd.DataFrame({
+          'annotations': [actions[i] for i in order],
+          'samples': [samples[i] for i in order],
+          'used samples': [resamples[i] for i in order]
+          }, index=[labels[i] for i in order])
+        df.plot.barh(ax=ax, title=f'{context} set' if context != 'all' else 'all data sets', figsize=(15,20), legend=True, logx=True)
+
         if context != 'all':
-            ax.hlines(self.dm.limit_per_class[context], -0.5, 30.5)
-        ax.set_title(f'{context} set' if context != 'all' else 'all data sets')
-        ax.legend()
-        ax.set_yscale('log')
+            ax.vlines(self.dm.limit_per_class[context], -0.5, 33.5)
+
         plt.tight_layout()
         plt.close()
 
-        self._handle(fig, context, f'class_distribution_{show}', save, upload)
+        self._handle(fig, context, f'class_distribution', save, upload)
 
         return fig
 

@@ -37,9 +37,9 @@ class ClipPlot:
         if mode == 'grid':
             return self.grid_plot
         elif mode == 'clip':
-            return HTML(self.clip_plot.to_html5_video())
+            return self.clip_plot.to_html5_video()
         elif mode == 'sample':
-            return HTML(self.sample_plot.to_html5_video())
+            return self.sample_plot.to_html5_video()
 
     def save(self, format: str):
         filename = self.save_dir.joinpath(f'{self.filename}.{format}')
