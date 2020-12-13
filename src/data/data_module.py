@@ -4,13 +4,13 @@ import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, WeightedRandomSampler, SubsetRandomSampler
 from src.data import DatabaseHandle, HarDataset, PreProcessing, DataStats
-from src.data.util import MediaDir
+from src.data.util import MediaDir, OutDir
 from src.util.fetch import DatabaseFetcher
 
 
 class DataModule(LightningDataModule):
 
-    def __init__(self, database: str, data_dir: str, num_frames: int, res: int, fps: int,
+    def __init__(self, database: str, data_dir: str, out_dir: str, num_frames: int, res: int, fps: int,
                  metadata_path: Optional[str],
                  batch_size=32,
                  classes=None, max_train_samples_per_class=500,
@@ -18,6 +18,8 @@ class DataModule(LightningDataModule):
         super().__init__()
         self.seed = seed
         self.media_dir = MediaDir(data_dir)
+        self.out_dir = OutDir(out_dir)
+
 
         data_path = self.media_dir.datasets()
         database_path = DatabaseFetcher.load(database, data_path)
@@ -56,7 +58,8 @@ class DataModule(LightningDataModule):
         self.pre_processor = None
 
     def prepare_data(self, verbose=False):
-        self.pre_processor = PreProcessing(self.database, self.media_dir.root, Path(self.precomputed_metadata_file),
+        self.pre_processor = PreProcessing(self.database, self.media_dir, self.out_dir,
+                                           metadata_path=Path(self.precomputed_metadata_file),
                                            res=360)
         self.video_metadata = self.pre_processor.prepare_data(verbose)
 

@@ -5,7 +5,8 @@ import torch
 import pandas as pd
 import numpy as np
 from src.data import HarDataset, DataModule, MediaDir
-from src.eval import OutDir, ClipPlot, PlotIterator, EvaluationModule, MultiLabelStatScores, MultiLabelStatCurves
+from src.data.util import OutDir
+from src.eval import ClipPlot, PlotIterator, EvaluationModule, MultiLabelStatScores, MultiLabelStatCurves
 
 
 class ReportEvaluationModule(EvaluationModule):

@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 
@@ -16,3 +17,6 @@ class OutDir:
 
     def sample(self):
         return self.root.joinpath('samples')
+
+    def metadata(self, date: datetime):
+        return self.root.joinpath('video_metadata', f'{date.strftime("%Y%m-%d%H-%M%S")}.pth')

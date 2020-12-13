@@ -6,17 +6,20 @@ from typing import Optional
 import torch
 from datetime import datetime
 
+from src.data.util import OutDir
+
 
 class PreProcessing:
 
-    def __init__(self, db: DatabaseHandle, data_path: Path, metadata_path: Optional[Path], res=360):
+    def __init__(self, db: DatabaseHandle, media_dir: MediaDir, out_dir: OutDir, metadata_path: Optional[Path], res=360):
         self.db = db
         self.fetch = VideoFetcher()
         self.convert = VideoConverter()
         self.not_found = set()
         self.res = res
 
-        self.media_dir = MediaDir(str(data_path.absolute()))
+        self.media_dir = media_dir
+        self.out_dir = out_dir
 
         self.video_metadata = dict(
             train=dict(video_paths=[], video_fps=[], video_pts=[], sac_urls=[], sac_keys=[]),
@@ -114,7 +117,7 @@ class PreProcessing:
 
         # check for video availability
         if len(self.not_found) > 0:
-            not_found_path: Path = self.media_dir.root.joinpath('not_found.txt')
+            not_found_path: Path = self.out_dir.root.joinpath('not_found.txt')
             with not_found_path.open("w+") as f:
                 f.writelines([url + '\n' for url in self.not_found])
 
@@ -122,7 +125,7 @@ class PreProcessing:
         else:
             print(f'all videos found')
 
-        metadata_out_path = self.media_dir.metadata(datetime.now())
+        metadata_out_path = self.out_dir.metadata(datetime.now())
         torch.save(video_metadata, metadata_out_path)
         print(f'video metadata saved to `{metadata_out_path}`')
 

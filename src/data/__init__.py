@@ -1,4 +1,4 @@
-from src.data.util.media_dir import MediaDir
+from src.data.util import MediaDir, OutDir
 from src.data.video_transform import VideoTransformation
 from src.data.database import DatabaseHandle
 from src.data.har_dataset import HarDataset

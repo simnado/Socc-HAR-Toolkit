@@ -7,7 +7,8 @@ import torch
 from datetime import datetime
 from sklearn.metrics import ConfusionMatrixDisplay
 from src.data import HarDataset, DataModule, MediaDir
-from src.eval import OutDir, ClipPlot, PlotIterator
+from src.eval import ClipPlot, PlotIterator
+from src.data.util import OutDir
 
 
 class EvaluationModule:
