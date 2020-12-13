@@ -175,18 +175,20 @@ class HarDataset(Dataset):
             start_pts = clip_pts[0].item()
             end_pts = clip_pts[-1].item()
             frames, _, _ = io.read_video(video_path, start_pts, end_pts)
-            if frames.shape[0] < self.num_frames:
-                print(f'WARNING: tensor on index={index} has only {frames.shape[0]} frames')
             # todo: maybe faster?
             # frames, _, _ = io._video_opt._read_video_from_file(video_path, video_width=224, video_height=224, video_pts_range=(start_pts, end_pts), read_audio_stream=False)
             resampling_idx = self.video_clips.resampling_idxs[video_idx][clip_idx]
+            if frames.shape[0] == 1:
+                print(f'WARNING: tensor on index={index} has only {frames.shape[0]} frames')
+                frames = torch.cat([frames, frames.clone()])
+            if frames.shape[0] < self.num_frames:
+                print(f'WARNING: tensor on index={index} has only {frames.shape[0]} frames')
             if isinstance(resampling_idx, torch.Tensor):
                 resampling_idx = resampling_idx - resampling_idx[0]
                 # sometimes the last frame of a clip gets lost. if so repeat last frame at the end
                 resampling_idx[resampling_idx >= len(frames)] = len(frames) - 1
             frames = frames[resampling_idx]
-            assert frames.shape[
-                       0] >= self.num_frames, f'resampled tensor on index={index} has only {frames.shape[0]} frames after resampling of {len(resampling_idx)} indices'
+            assert frames.shape[0] >= self.num_frames, f'resampled tensor on index={index} has only {frames.shape[0]} frames after resampling of {str(resampling_idx)} indices'
         else:
             clip_pts = self.video_clips.resampling_idxs[video_idx][clip_idx]
             vr = de.VideoReader(video_path, num_threads=1)  # , ctx=de.gpu())

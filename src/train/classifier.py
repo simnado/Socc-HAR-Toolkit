@@ -15,8 +15,8 @@ from torchvision.transforms import Normalize
 
 class Classifier(LightningModule):
 
-    def __init__(self, backbone: Backbone, lr: float, weight_decay: float, epochs: int,
-                 scheduler: str, optim: str, batch_size: int, num_classes: int,
+    def __init__(self, backbone: Backbone, weight_decay: float, epochs: int,
+                 scheduler: str, optim: str, num_classes: int,
                  mean: [float], std: [float],
                  train_samples: int, pretrained_path: Path,
                  num_frames: int, res: int, fps: int, consensus='max',
@@ -26,12 +26,14 @@ class Classifier(LightningModule):
         assert consensus in ['avg', 'max']
 
         super().__init__()
-        self.save_hyperparameters('lr', 'weight_decay', 'epochs', 'scheduler', 'optim', 'batch_size',
+        self.save_hyperparameters('weight_decay', 'epochs', 'scheduler', 'optim',
                                   'num_frames', 'res', 'fps', 'consensus',
                                   'trainable_groups',
                                   'pretrained_path', 'mean', 'std')
         self.backbone = backbone
         self.hparams.name = self.backbone.__class__.__name__
+        self.hparams.batch_size = 1
+        self.hparams.lr = [0.003, 0.003]
 
         if self.hparams.pretrained_path is None:
             self.hparams.pretrained_path = self.backbone.provide_pretrained_weights()
@@ -66,7 +68,6 @@ class Classifier(LightningModule):
     def forward(self, x):
         batch_size, num_chunks, channels, frames, width, height = x.size()
 
-        assert batch_size <= self.hparams.batch_size  # smaller if test loop
         assert num_chunks <= 5
         assert channels == 3
         assert frames == self.hparams.num_frames
@@ -169,11 +170,16 @@ class Classifier(LightningModule):
             self.train_stat_curves.reset()
 
         x, y, info = batch
+
+        assert x.shape[0] <= self.train_bs
+
         out = self(x)
         losses = self.reportLoss(out, y)
         losses = torch.mean(losses, dim=1)  # reduce per sample
         # todo: is this a problem? batch_loss = losses.mean()
         batch_loss = self.loss(out, y)
+
+        assert batch_loss.item() > 0
         scores = torch.sigmoid(out)
 
         self.train_stat_scores(scores, y)
@@ -213,6 +219,8 @@ class Classifier(LightningModule):
             self.val_stat_curves.reset()
 
         x, y, info = batch
+        assert x.shape[0] <= self.train_bs
+
         out = self(x)
         losses = self.reportLoss(out, y)
         losses = torch.mean(losses, dim=1)  # reduce per sample
@@ -251,6 +259,8 @@ class Classifier(LightningModule):
             self.test_stat_curves.reset()
 
         x, y, info = batch
+        assert x.shape[0] <= self.test_bs
+
         out = self(x)
         losses = self.reportLoss(out, y)
         losses = torch.mean(losses, dim=1)  # reduce per sample
@@ -310,12 +320,27 @@ class Classifier(LightningModule):
         return np.geomspace(self.hparams.lr[-1], self.hparams.lr[0], self.hparams.trainable_groups)
 
     @property
+    def train_bs(self):
+        def bs_of(n):
+            while (n & n - 1):
+                n = n & n - 1  # unset rightmost bit
+            return n
+        max_bs = min(64, bs_of(self.hparams.batch_size))
+        assert 64 % max_bs == 0
+
+        return max_bs
+
+    @property
+    def test_bs(self):
+        return max(1, self.hparams.batch_size // 5)
+
+    @property
     def accumulate_grad_batches(self):
-        return max(1, 64 // self.hparams.batch_size)
+        return max(1, 64 // self.train_bs)
 
     @property
     def train_iterations(self):
-        return math.ceil(self.train_samples / self.hparams.batch_size)
+        return math.ceil(self.train_samples / self.train_bs)
 
     def load_weights(self):
         if self.hparams.pretrained_path and self.hparams.pretrained_path.exists():

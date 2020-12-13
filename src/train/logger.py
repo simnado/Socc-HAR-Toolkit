@@ -12,7 +12,10 @@ class TrainLogger(CometLogger):
         super().__init__(api_key=COMET_API_TOKEN,
                          workspace=workspace,
                          project_name=project_name,
-                         experiment_name=run_id)
+                         experiment_name=run_id,
+                         log_code=True,
+                         log_graph=True,
+                         log_git_metadata=True)
         self.run_id = run_id
         if torch.cuda.is_available():
             self.experiment.add_tag(torch.cuda.get_device_name(0))

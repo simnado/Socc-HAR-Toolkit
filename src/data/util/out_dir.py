@@ -10,6 +10,7 @@ class OutDir:
         self.root.absolute().mkdir(exist_ok=True)
         self.root.joinpath('stats').mkdir(exist_ok=True)
         self.root.joinpath('samples').mkdir(exist_ok=True)
+        self.root.joinpath('video_metadata').mkdir(exist_ok=True)
         assert self.root.exists(), "path does not exists"
 
     def stats(self):
