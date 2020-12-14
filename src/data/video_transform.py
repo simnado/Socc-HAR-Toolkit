@@ -35,7 +35,6 @@ class VideoTransformation(object):
             ])
         else:
             transforms = Compose([
-                Resize((self.res, self.res)),
                 Lambda(lambda data: data / 255.0)
             ])
         return transforms(frames)

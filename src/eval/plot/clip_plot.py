@@ -30,8 +30,8 @@ class ClipPlot:
         self._grid_fig = None
         self._sample_fig = None
         self._clip_fig = None
-        self.filename = f'{self.info["key"]}_{self.info["start"]}-{self.info["end"]}'
-        self.title = f'Class={", ".join(self.y_labels)} {self.filename}'
+        self.filename = f'{self.info["key"]}:{self.info["start"]:.1f}-{self.info["end"]:.1f}'
+        self.title = f'{self.filename} {", ".join(self.y_labels)}'
 
     def show(self, mode='clip'):
         if mode == 'grid':
@@ -79,6 +79,34 @@ class ClipPlot:
         axes.barh(y=[-1, -2, -3, -4, -5], width=top_k, label=top_k_label, color='powderblue')
         for i in range(5):
             axes.annotate(top_k_label[i], xy=(5, -1 * (i + 1)))
+
+        return axes
+
+    def _annotation_plot(self, axes, progress: int):
+        annos = self.info['annotations']
+        score_title = 'actions'
+
+        axes.set_xlim(self.info['start'] - 1, self.info['end'] + 1)
+        axes.set_title(score_title)
+        axes.grid(axis='x')
+
+        anno_dict = dict()
+        for anno in annos:
+            action_duration = anno['segment'][1] - anno['segment'][0]
+            if anno['label'] not in anno_dict:
+                anno_dict[anno['label']] = []
+            anno_dict[anno['label']].append((anno['segment'][0], action_duration))
+
+        ticks = []
+        labels = []
+        for idx, (key, val) in enumerate(anno_dict.items()):
+            axes.broken_barh(val, (idx * 10, 9))
+            ticks.append(idx * 10 + 5)
+            labels.append(key)
+
+        axes.set_yticks(ticks)
+        axes.set_yticklabels(labels)
+        axes.vlines(x=self.info['start'] + progress * (self.info['end'] - self.info['start']), ymin=0, ymax=(ticks[-1] if len(ticks) else 0) + 5)
 
         return axes
 
@@ -138,16 +166,25 @@ class ClipPlot:
         matplotlib.use("Agg")
 
         # plot pred
-        animation_fig, (ax0, ax1) = plt.subplots(1, 2, gridspec_kw={'width_ratios': [2, 1]}, figsize=(12, 8))
+        animation_fig, (ax0, ax1) = plt.subplots(nrows=2, ncols=2, gridspec_kw={'width_ratios': [2, 1], 'height_ratios': [3, 1]}, figsize=(12, 8))
         x = self._get_x(resize=resized)
+
+        sample_ax = ax0[0]
+        score_ax = ax0[1]
+        anno_ax = ax1[0]
+        ax1[1].axis('off')
+
 
         camera = Camera(animation_fig)
         for idx, img in enumerate(x):
-            ax0.set_title(self.title)
-            ax0.imshow(img)
-            ax0.text(x=len(img) + 5, y=len(img) + 12, s=f'{idx}/{len(x)}')
+            sample_ax.set_title(self.title)
+            sample_ax.imshow(img)
 
-            self._score_plot(ax1)
+            self._annotation_plot(anno_ax, idx/(len(x) -1))
+            if self.pred is not None:
+                self._score_plot(score_ax)
+            else:
+                score_ax.axis('off')
 
             camera.snap()
 

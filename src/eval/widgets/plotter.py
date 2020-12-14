@@ -58,6 +58,7 @@ class Plotter:
         self.canvas = widgets.HTML()
         self.controls = widgets.ToggleButtons(
             options=[('grid (image)', 'grid'), ('tensor (video)', 'sample'), ('clip (video)', 'clip')],
+            value='sample'
         )
 
         self.prev_btn = widgets.Button(
@@ -80,6 +81,9 @@ class Plotter:
         self.prev_btn.on_click(self.on_prev)
         self.next_btn.on_click(self.on_next)
         self.save_btn.on_click(self.on_save)
+        def on_mode_change(b):
+            self.update()
+        self.controls.observe(on_mode_change, 'value')
 
         self.container = widgets.VBox([
             widgets.Box([self.set_select, self.class_select, self.select_btn]),
@@ -126,8 +130,6 @@ class Plotter:
         self.prev_btn.disabled = self.is_first
         self.next_btn.disabled = self.is_last
 
-        self.controls.value = 'clip' # todo
-        print('mode changed to ' + self.controls.value)
         row = self.indices[self.index]
         self.labels.value = ', '.join([self.dm.classes[idx] for idx in torch.arange(0, 32)[self.dataset.y[row] > 0] ])
 
