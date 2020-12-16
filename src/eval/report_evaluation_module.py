@@ -27,7 +27,7 @@ class ReportEvaluationModule(EvaluationModule):
         self.val_curve: Optional[MultiLabelStatCurves] = None
         self.test_curve: Optional[MultiLabelStatCurves] = None
 
-    def get_sample_plot_by_report(self, context='train', label=None, epoch=None):
+    def get_top_loss_samples(self, context='train', epoch=None, label=None, limit=500, desc=True):
         if epoch is None:
             epoch = self.num_epochs - 1
 
@@ -39,37 +39,12 @@ class ReportEvaluationModule(EvaluationModule):
 
         df = df[(df.subset == context) & (df.epoch == epoch)]
 
-        if label is not None:
-            df = df[df.labels.str.contains(label, na=False)]
-
-        sample = df.sample()
-
-        print(f'{sample.key.item()}@{sample.start.item()} - {sample.labels.item()}')
-
-        # todo: context=all
-        print(context)
-        dataset_idx = self.dm.datasets[context].get_row(sample.key.item(), sample.start.item())
-
-        preds = np.fromstring(sample.scores.item()[1:-1], dtype=float, sep=', ')
-        preds = torch.from_numpy(preds)
-        return self.get_sample_plot(row=dataset_idx, context=context, pred=preds)
-
-    def get_top_loss_samples(self, context='train', epoch=None, label=None, limit=500, desc=True):
-        if epoch is None:
-            epoch = self.num_epochs - 1
-
-        if context == 'test':
-            df = self.test_df
-            epoch = self.last_test_epoch
-        else:
-            df = self.report
-
-        df = df[(df.subset == context) & (df.epoch == epoch)].sort_values(by=['loss'], ascending=not desc).head(limit)
-
         if label and label != 'background':
-            df = df[df.labels.str.contains(label, na=False)]
+            df = df[((df.labels.str.contains(f'{label},', na=False)) | (df.labels.str.contains(f'{label}$', na=False)))]
         elif label and label == 'background':
             df = df[df.labels.str.contains('nan', na=True)]
+
+        df = df.sort_values(by=['loss'], ascending=not desc).head(limit)
 
         rows = []
         pred = []
@@ -122,7 +97,9 @@ class ReportEvaluationModule(EvaluationModule):
 
     def _label_occurances(self, split: str, epoch: int, label: str):
         df = self.report
-        return len(df[(df.subset == split) & (df.epoch == epoch) & (df.labels.str.contains(label, na=False))])
+        df = df[(df.subset == split) & (df.epoch == epoch)]
+        df = df[((df.labels.str.contains(f'{label},', na=False)) | (df.labels.str.contains(f'{label}$', na=False)))]
+        return len(df.index)
 
     def _background_occurances(self, split: str, epoch: int):
         df = self.report
