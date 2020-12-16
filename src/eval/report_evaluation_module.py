@@ -54,7 +54,7 @@ class ReportEvaluationModule(EvaluationModule):
         preds = torch.from_numpy(preds)
         return self.get_sample_plot(row=dataset_idx, context=context, pred=preds)
 
-    def get_top_loss_plots(self, context='train', epoch=None, limit=50):
+    def get_top_loss_samples(self, context='train', epoch=None, label=None, limit=500, desc=True):
         if epoch is None:
             epoch = self.num_epochs - 1
 
@@ -64,11 +64,17 @@ class ReportEvaluationModule(EvaluationModule):
         else:
             df = self.report
 
-        df = df[(df.subset == context) & (df.epoch == epoch)].sort_values(by=['loss'], ascending=False).head(50)
+        df = df[(df.subset == context) & (df.epoch == epoch)].sort_values(by=['loss'], ascending=not desc).head(limit)
+
+        if label and label != 'background':
+            df = df[df.labels.str.contains(label, na=False)]
+        elif label and label == 'background':
+            df = df[df.labels.str.contains('nan', na=True)]
+
         rows = []
         pred = []
 
-        for i in range(limit):
+        for i in range(len(df.index)):
             sample = df.iloc[i]
             try:
                 dataset_idx = self.dm.datasets[context].get_row(sample.key, sample.start)
@@ -81,8 +87,9 @@ class ReportEvaluationModule(EvaluationModule):
             preds = torch.from_numpy(preds)
             pred.append(preds)
 
+        rows = torch.IntTensor(rows)
         pred = torch.stack(pred, dim=0)
-        return self.get_sample_plots(indices=rows, pred=pred, context=context, label=None)
+        return (rows, pred)
 
     def integrity_check(self) -> bool:
         df = self.report

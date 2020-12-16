@@ -25,13 +25,12 @@ class Storage:
         self.phase.observe(self.on_phase_change, 'value')
 
     def on_phase_change(self, b):
-        self.exp.options = [(key, val) for key, val in benchmarks[self.phase.value - 1]]
+        self.exp.options = [(key, val) for key, val in benchmarks[self.phase.value - 1].items()]
 
     def widget(self):
         return widgets.VBox([
             self.phase,
             self.exp,
-            widgets.HBox([self.prev_btn, self.save_btn, self.next_btn])
         ])
 
     @property
@@ -64,18 +63,18 @@ class StoredExperiment:
 
         return filename
 
-    def get_report(self, experiment_path: str) -> Path:
+    def get_report(self) -> Path:
 
-        filename = Path(f'{experiment_path.replace("/", "_")}.csv')
-        if experiment_path and not filename.exists():
+        filename = Path(f'{self.experiment_path.replace("/", "_")}.csv')
+        if self.experiment_path and not filename.exists():
 
-            experiment = self.comet_api.get(experiment_path)
+            experiment = self.comet_api.get(self.experiment_path)
             assets = experiment.get_asset_list()
             reports = [asset for asset in assets if 'report.csv' in asset['fileName']]
             report = reports[-1]
 
             if report:
-                print('download report from ' + experiment_path)
+                print('download report from ' + self.experiment_path)
                 bin = experiment.get_asset(report['assetId'], 'binary')
                 with filename.open('wb') as file:
                     file.write(bin)

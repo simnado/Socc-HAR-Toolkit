@@ -34,22 +34,22 @@ class Plotter:
         )
 
         self.status = widgets.Label(f'')
-        self.period = widgets.Text(
+        self.period = widgets.HTML(
             value='',
             description='Period:',
             disabled=True
         )
-        self.start = widgets.Text(
+        self.start = widgets.HTML(
             value='',
             description='Start:',
             disabled=True
         )
-        self.end = widgets.Text(
+        self.end = widgets.HTML(
             value='',
             description='End:',
             disabled=True
         )
-        self.labels = widgets.Text(
+        self.labels = widgets.HTML(
             value='',
             description='Labels:',
             disabled=True
@@ -93,7 +93,7 @@ class Plotter:
             widgets.HBox([self.prev_btn, self.save_btn, self.next_btn])
         ])
 
-        self.on_select(None)
+        #self.on_select(None)
 
     def on_select(self, b):
         self.indices = self.stats.indices
@@ -130,12 +130,11 @@ class Plotter:
         self.prev_btn.disabled = self.is_first
         self.next_btn.disabled = self.is_last
 
-        row = self.indices[self.index]
+        row = int(self.indices[self.index])
         self.labels.value = ', '.join([self.dm.classes[idx] for idx in torch.arange(0, 32)[self.dataset.y[row] > 0] ])
 
         self.canvas.value = ''
-        self.plot = ClipPlot(None, dataset=self.dataset, context=self.set_select.value, row=row, pred=None,
-                        save_dir=self.save_dir)
+        self.plot = self.get_plot()
 
         self.save_btn.disabled = self.plot is None
         self.status.value = f'{self.index + 1}/{self.total}'
@@ -144,6 +143,11 @@ class Plotter:
         self.end.value = str(self.plot.info['end'])
 
         self.canvas.value = self.plot.show(mode=self.mode)
+
+    def get_plot(self):
+        return ClipPlot(None, dataset=self.dataset, context=self.set_select.value, row=self.indices[self.index],
+                        pred=None,
+                        save_dir=self.save_dir)
 
     def _ipython_display_(self):
         return display(self.container)
