@@ -166,7 +166,7 @@ class HarDataset(Dataset):
     def __len__(self):
         return len(self.x)
 
-    def get_tensor(self, index, resize=True, vr=False):
+    def get_tensor(self, index, resize=True, vr=False, chunked=True):
         clip_index = self.x[index]
 
         video_idx, clip_idx = self.video_clips.get_clip_location(clip_index)
@@ -183,7 +183,7 @@ class HarDataset(Dataset):
             frames, _, _ = io.read_video(video_path, meta['start'], meta['end'], pts_unit='sec')
             clip_frames = len(frames)
             assert clip_frames >= self.num_frames
-            resample_idx = torch.linspace(0, clip_frames - 1, self.num_frames, dtype=torch.uint8)
+            resample_idx = torch.linspace(0, clip_frames - 1, self.num_frames_per_sample, dtype=torch.int16).tolist()
             frames = frames[resample_idx]
 
         elif self.backend == 'av':
@@ -220,7 +220,8 @@ class HarDataset(Dataset):
         frames = frames.permute((1, 0, 2, 3))
 
         # reshape if test loop from 4D to 5D (Chunks x C x T x H x W)
-        frames = self._get_chunks(frames)
+        if chunked:
+            frames = self._get_chunks(frames)
         assert frames.shape[2] >= self.num_frames, f'chunked tensor on index={index} has only {frames.shape[2]} frames'
 
         return frames
