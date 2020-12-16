@@ -1,24 +1,61 @@
 from pathlib import Path
 from comet_ml.api import API
+from ipywidgets import widgets
+
+from src.util.benchmarks import benchmarks
+
+API_KEY = "lL8eJl4CI5wlfif6CuU3WS4FE"
 
 
 class Storage:
 
-    def __init__(self, api_key):
-        # "lL8eJl4CI5wlfif6CuU3WS4FE"
-        self.comet_api = API(api_key=api_key)
+    def __init__(self):
+        self.phase = widgets.Dropdown(
+            options=[1, 2, 3],
+            value=None,
+            description='Phase:',
+        )
 
-    def get_checkpoints(self, experiment_path: str) -> Path:
+        self.exp = widgets.Dropdown(
+            options=[],
+            value=None,
+            description='Experiment:',
+        )
 
-        filename = Path(f'{experiment_path.replace("/", "_")}.ckpt')
-        if experiment_path and not filename.exists():
+        self.phase.observe(self.on_phase_change, 'value')
 
-            experiment = self.comet_api.get(experiment_path)
+    def on_phase_change(self, b):
+        self.exp.options = [(key, val) for key, val in benchmarks[self.phase.value - 1]]
+
+    def widget(self):
+        return widgets.VBox([
+            self.phase,
+            self.exp,
+            widgets.HBox([self.prev_btn, self.save_btn, self.next_btn])
+        ])
+
+    @property
+    def experiment_path(self):
+        return self.exp.value
+
+
+class StoredExperiment:
+
+    def __init__(self, experiment_path):
+        self.comet_api = API(api_key=API_KEY)
+        self.experiment_path = experiment_path
+
+    def get_checkpoints(self) -> Path:
+
+        filename = Path(f'{self.experiment_path.replace("/", "_")}.ckpt')
+        if self.experiment_path and not filename.exists():
+
+            experiment = self.comet_api.get(self.experiment_path)
             assets = experiment.get_asset_list()
             ckpt = next(asset for asset in assets if '.ckpt' in asset['fileName'])
 
             if ckpt:
-                print('download ckpt from ' + experiment_path)
+                print('download ckpt from ' + self.experiment_path)
                 bin = experiment.get_asset(ckpt['assetId'], 'binary')
                 with filename.open('wb') as file:
                     file.write(bin)
