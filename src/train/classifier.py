@@ -171,7 +171,7 @@ class Classifier(LightningModule):
 
         x, y, info = batch
 
-        assert x.shape[0] <= self.train_bs
+        # todo: not working in trainer.tune: assert x.shape[0] <= self.train_bs
 
         out = self(x)
         losses = self.reportLoss(out, y)

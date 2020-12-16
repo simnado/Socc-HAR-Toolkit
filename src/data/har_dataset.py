@@ -174,11 +174,13 @@ class HarDataset(Dataset):
         meta = self.info[index]
 
         if vr:
-            frames = []
-            reader = io.VideoReader(video_path, "video")
-            for frame in itertools.takewhile(lambda x: x['pts'] <= meta['end'], reader.seek(meta['start'])):
-                frames.append(frame['data'])
-            frames = torch.cat(frames)
+            # todo: wait for pre-compiled version including VideoReader
+            #frames = []
+            #reader = io.VideoReader(video_path, "video")
+            #for frame in itertools.takewhile(lambda x: x['pts'] <= meta['end'], reader.seek(meta['start'])):
+            #    frames.append(frame['data'])
+            #frames = torch.cat(frames)
+            frames, _, _ = io.read_video(video_path, meta['start'], meta['end'], pts_unit='sec')
             clip_frames = len(frames)
             assert clip_frames >= self.num_frames
             resample_idx = torch.linspace(0, clip_frames - 1, self.num_frames, dtype=torch.uint8)
