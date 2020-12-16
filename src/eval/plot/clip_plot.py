@@ -191,6 +191,6 @@ class ClipPlot:
         return camera.animate(interval=100, blit=True, repeat_delay=1000)
 
     def _get_x(self, resize=True):
-        x = self.dataset.get_tensor(self.row, resize)
+        x = self.dataset.get_tensor(self.row, resize, vr=True)
         return x[0].permute((1, 2, 3, 0))  # (T, H, W, C)
 

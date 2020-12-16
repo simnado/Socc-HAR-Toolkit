@@ -1,3 +1,5 @@
+import itertools
+
 import torch
 from torch.utils.data import Dataset
 from torchvision.datasets.video_utils import VideoClips
@@ -164,13 +166,25 @@ class HarDataset(Dataset):
     def __len__(self):
         return len(self.x)
 
-    def get_tensor(self, index, resize=True):
+    def get_tensor(self, index, resize=True, vr=False):
         clip_index = self.x[index]
 
         video_idx, clip_idx = self.video_clips.get_clip_location(clip_index)
         video_path = self.video_clips.video_paths[video_idx]
+        meta = self.info[index]
 
-        if self.backend == 'av':
+        if vr:
+            frames = []
+            reader = io.VideoReader(video_path, "video")
+            for frame in itertools.takewhile(lambda x: x['pts'] <= meta['end'], reader.seek(meta['start'])):
+                frames.append(frame['data'])
+            frames = torch.cat(frames)
+            clip_frames = len(frames)
+            assert clip_frames >= self.num_frames
+            resample_idx = torch.linspace(0, clip_frames - 1, self.num_frames, dtype=torch.uint8)
+            frames = frames[resample_idx]
+
+        elif self.backend == 'av':
             clip_pts = self.video_clips.clips[video_idx][clip_idx]
             start_pts = clip_pts[0].item()
             end_pts = clip_pts[-1].item()

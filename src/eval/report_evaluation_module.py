@@ -89,7 +89,8 @@ class ReportEvaluationModule(EvaluationModule):
 
         # val is deterministic
         for index, row in df[df.subset == 'val'].sample(n=10).iterrows():
-            assert len(df[(df.key == row.key) & (df.start == row.start)]) == self.num_epochs
+            num_samples = len(df[(df.key == row.key) & (df.start == row.start)])
+            assert num_samples == self.num_epochs, f'only got {num_samples} val samples for row {row.key}@{row.start}'
 
         # test is deterministic
         if self.num_test_runs > 0:
