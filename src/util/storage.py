@@ -59,7 +59,7 @@ class StoredExperiment:
                 with filename.open('wb') as file:
                     file.write(bin)
             else:
-                raise Exception('no checkpoints found')
+                return None
 
         return filename
 
@@ -71,7 +71,7 @@ class StoredExperiment:
             experiment = self.comet_api.get(self.experiment_path)
             assets = experiment.get_asset_list()
             reports = [asset for asset in assets if 'report.csv' in asset['fileName']]
-            report = reports[-1]
+            report = reports[-1] if len(reports) > 0 else None
 
             if report:
                 print('download report from ' + self.experiment_path)
@@ -79,6 +79,6 @@ class StoredExperiment:
                 with filename.open('wb') as file:
                     file.write(bin)
             else:
-                raise Exception('no report found')
+                return None
 
         return filename

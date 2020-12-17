@@ -26,8 +26,6 @@ class HarDataset(Dataset):
         de.bridge.set_bridge('torch')
 
         self.backend = backend
-        self.df = pd.DataFrame(
-            columns=['key', 'video', 'start', 'end', 'labels', 'critical'])
 
         self.background_min_distance = background_min_distance
         self.period_max_distance = period_max_distance  # time border for samples outside a period

@@ -185,10 +185,9 @@ class Classifier(LightningModule):
         self.train_stat_scores(scores, y)
         self.train_stat_curves(scores, y)
 
-        self.log('train_max_score', scores.max())
-        self.log('train_batch_loss', batch_loss, prog_bar=True)
-        self.log('train_batch_f1_macro', self.train_stat_scores.f1('macro'), prog_bar=True)
-        self.log('train_batch_balanced_acc_macro', self.train_stat_scores.balanced_accuracy('macro'), prog_bar=True)
+        self.log('train_batch_loss', batch_loss)
+        self.log('train_batch_f1_macro', self.train_stat_scores.f1('macro'))
+        self.log('train_batch_balanced_acc_macro', self.train_stat_scores.balanced_accuracy('macro'))
 
         return {'losses': losses, 'meta': info, 'loss': batch_loss}
 
@@ -200,7 +199,7 @@ class Classifier(LightningModule):
         self.log('train_precision_macro', self.train_stat_scores.precision('macro'))
         self.log('train_recall_macro', self.train_stat_scores.recall('macro'))
         self.log('train_f1_macro', self.train_stat_scores.f1('macro'))
-        self.log('train_balanced_acc_macro', self.train_stat_scores.balanced_accuracy('macro'), prog_bar=True)
+        self.log('train_balanced_acc_macro', self.train_stat_scores.balanced_accuracy('macro'))
         self.log('train_acc_macro', self.train_stat_scores.accuracy('macro'))
         self.log('train_hamming_loss', self.train_stat_scores.hamming_loss())
         self.log('train_time', train_time, on_epoch=True)
@@ -229,8 +228,6 @@ class Classifier(LightningModule):
 
         self.val_stat_scores(scores, y)
         self.val_stat_curves(scores, y)
-
-        self.log('val_max_score', scores.max())
 
         return {'losses': losses, 'meta': info}
 
@@ -269,8 +266,6 @@ class Classifier(LightningModule):
 
         self.test_stat_scores(scores, y)
         self.test_stat_curves(scores, y)
-
-        self.log('test_max_score', scores.max())
 
         return {'losses': losses, 'meta': info}
 
