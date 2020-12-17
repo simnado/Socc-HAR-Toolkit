@@ -13,7 +13,9 @@ phase_2 = dict(
     SlowFast_4x16_72_2='narendorf/soccar-32-ph1/5648da7e2212491bb7195d27ff43f48f',
 
     ir_CSN_4g_32_2='narendorf/soccar-32-ph1/822944fc50984cc99ee96586ec15e9f1',
+    ir_CSN_4g_24_6='narendorf/soccar-32-ph1/a009a640232646bc970d832bbf1a8063',
     ir_CSN_4g_32_3='narendorf/soccar-32-ph1/b72644fe5e324948a6c8c5bdadd06ea6',
+    ir_CSN_4g_48_2='narendorf/soccar-32-ph1/ee68cb3f6dd14c66b2c68d1df72a818b',
 )
 
 benchmarks = [phase_1, phase_2]

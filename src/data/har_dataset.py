@@ -1,5 +1,3 @@
-import itertools
-
 import torch
 from torch.utils.data import Dataset
 from torchvision.datasets.video_utils import VideoClips
@@ -7,6 +5,7 @@ from torchvision import io
 from tqdm.auto import tqdm
 import decord as de
 import numpy as np
+import pandas as pd
 from src.data import DatabaseHandle, VideoTransformation
 
 
@@ -27,6 +26,8 @@ class HarDataset(Dataset):
         de.bridge.set_bridge('torch')
 
         self.backend = backend
+        self.df = pd.DataFrame(
+            columns=['key', 'video', 'start', 'end', 'labels', 'critical'])
 
         self.background_min_distance = background_min_distance
         self.period_max_distance = period_max_distance  # time border for samples outside a period
@@ -69,6 +70,9 @@ class HarDataset(Dataset):
     def get_samples(self):
         y = []
 
+        for keys in self.video_metadata['sac_keys']:
+            keys.sort()
+
         print('collecting samples')
         for idx in tqdm(range(len(self.video_clips))):
             video_idx, clip_idx = self.video_clips.get_clip_location(idx)
@@ -93,14 +97,13 @@ class HarDataset(Dataset):
                 continue
 
             vec, json, critical = self._get_annotations(annotations, [start, end])
-
+            video_id = curr_record['url'].split('v=')[1] if 'youtube' in curr_record['url'] else \
+                curr_record['url'].split('id=')[1]
             if vec is None or (critical and not self.allow_critical):
                 continue
             else:
                 self.x.append(idx)
                 y.append(vec)
-                video_id = curr_record['url'].split('v=')[1] if 'youtube' in curr_record['url'] else \
-                curr_record['url'].split('id=')[1]
                 sample_id = f"{key}@{start:.2f}"
                 self.info.append(
                     dict(key=key, start=start, end=end, path=path, video=video_id, critical=critical, annotations=json,
@@ -277,3 +280,7 @@ class HarDataset(Dataset):
     @property
     def video_paths(self):
         return self.video_metadata['video_paths']
+
+    @property
+    def df(self):
+        return pd.from_dict(self.meta)
