@@ -30,7 +30,7 @@ class Relabeler(Plotter):
         self.scores = None
         self.action_buttons = widgets.ToggleButtons(
             options=['pass', 'add', 'edit', 'delete'],
-            value='pass'
+            layout=widgets.Layout(width='100%')
         )
         self.action_buttons.observe(self.on_action_mode_changed, 'value')
 
@@ -55,49 +55,47 @@ class Relabeler(Plotter):
         self.changelog = widgets.Textarea(
             value='',
             description='Changes:',
-            disabled=True
+            disabled=True,
+            layout=widgets.Layout(width='100%', height='100px')
         )
-
-        self.container = widgets.VBox([
+        self.container = widgets.GridBox([
             widgets.Box([self.set_select, self.epoch_select, self.class_select, self.sort_descending, self.select_btn]),
             widgets.Box([self.status, self.period, self.start, self.end, self.labels]),
             self.canvas,
             self.controls,
             widgets.HBox([self.prev_btn, self.save_btn, self.next_btn]),
             self.action_buttons,
-            widgets.HBox([self.rl_label, self.rl_segment, self.rl_submit]),
+            widgets.HBox([self.rl_label, self.rl_segment, self.rl_submit], layout=widgets.Layout(width='100%')),
             self.changelog
-        ])
+        ], layout=widgets.Layout(grid_template_columns="repeat(1, 700px)"))
 
         self.on_select(None)
 
     def on_relabel_entity_changed(self, b):
-        if self.relabel_action == 'delete' or self.relabel_action == 'edit':
-            start = self.meta['start']
-            end = self.meta['end']
+        if self.rl_label.value and (self.relabel_action == 'add' or self.relabel_action == 'edit' or self.relabel_action == 'pass'):
+            self.rl_segment.disabled = self.relabel_action == 'pass'
 
-            self.rl_segment.disabled = False
-            self.rl_segment.min = 0
-            self.rl_segment.max = end + 1
-            self.rl_segment.min = start - 1
-
-            self.rl_segment.value = self.nearby_actions[b.value]['segment']
+            print(f'index {self.rl_label.value} selected')
+            if self.relabel_action != 'add':
+                self.rl_segment.value = self.nearby_actions[self.rl_label.value]['segment']
 
     def on_action_mode_changed(self, b):
+
         self.rl_label.value = None
         self.rl_label.disabled = False
-        self.rl_segment.disabled = True
+        self.rl_segment.disabled = False
         self.rl_segment.value = [0,0]
         if self.relabel_action == 'pass':
             self.rl_segment.disabled = True
-            self.rl_label.options = [(idx, anno['label']) for idx, anno in enumerate(self.nearby_actions)]
+            self.rl_label.options = [(anno['label'], idx) for idx, anno in enumerate(self.nearby_actions)]
         elif self.relabel_action == 'add':
             self.rl_label.options = self.dm.classes
         elif self.relabel_action == 'edit':
-            self.rl_label.options = [(idx, anno['label']) for idx, anno in enumerate(self.nearby_actions)]
+            self.rl_label.options = [(anno['label'], idx) for idx, anno in enumerate(self.nearby_actions)]
         elif self.relabel_action == 'delete':
-            self.rl_label.options = [(idx, anno['label']) for idx, anno in enumerate(self.nearby_actions)]
+            self.rl_label.options = [(anno['label'], idx) for idx, anno in enumerate(self.nearby_actions)]
             self.rl_segment.disabled = True
+        self.rl_label.value = None
 
     def on_relabel(self, b):
         if self.relabel_action == 'pass':
@@ -131,9 +129,14 @@ class Relabeler(Plotter):
         super().update()
         self.action_buttons.value = 'pass'
         self.changelog.value = ''
+        start = self.meta['start']
+        end = self.meta['end']
+        self.rl_segment.min = 0
+        self.rl_segment.max = end + 1
+        self.rl_segment.min = start - 1
 
     def get_plot(self):
-        return ClipPlot(None, dataset=self.dataset, context=self.set_select.value, row=self.indices[self.index],
+        return ClipPlot(self.logger, dataset=self.dataset, context=self.set_select.value, row=self.indices[self.index],
                         pred=self.scores[self.index],
                         save_dir=self.save_dir)
 

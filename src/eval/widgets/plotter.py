@@ -15,6 +15,7 @@ class Plotter:
         self.dm = dm
         self.save_dir = save_dir
         self.save_dir.mkdir(exist_ok=True)
+        self.logger = logger
 
         self.set_select = widgets.Dropdown(
             options=['train', 'val', 'test'],
@@ -146,7 +147,7 @@ class Plotter:
         self.canvas.value = self.plot.show(mode=self.mode)
 
     def get_plot(self):
-        return ClipPlot(None, dataset=self.dataset, context=self.set_select.value, row=self.indices[self.index],
+        return ClipPlot(self.logger, dataset=self.dataset, context=self.set_select.value, row=self.indices[self.index],
                         pred=None,
                         save_dir=self.save_dir)
 
