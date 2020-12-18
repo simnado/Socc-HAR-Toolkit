@@ -13,12 +13,13 @@ from src.data.util import OutDir
 
 class EvaluationModule:
 
-    def __init__(self, out_dir: str, data_module: DataModule, logger, img_format='eps'):
+    def __init__(self, out_dir: str, data_module: DataModule, logger, img_format=['png']):
         self.dm = data_module
         self.logger = logger
         self.out_dir = OutDir(out_dir)
 
-        assert img_format in ['svg', 'eps', 'png']
+        for ext in img_format:
+            assert ext in ['svg', 'eps', 'png']
         self.file_format = img_format
 
     def plot_background_ratio(self, context='all', save=False, upload=False):
@@ -172,9 +173,10 @@ class EvaluationModule:
 
     def _handle(self, fig, context: str, type: str, save: bool, upload: bool):
         now = datetime.now()
-        filename = f'{self.out_dir.stats()}/{type}_{context}_{now.strftime("%Y%m-%d%H-%M%S")}.{self.file_format}'
-        if save:
-            fig.savefig(filename, format=self.file_format, bbox_inches='tight')
-        if upload:
-            with self.logger.experiment.context_manager(context):
-                self.logger.experiment.log_asset(filename)
+        for format in self.file_format:
+            filename = f'{self.out_dir.stats()}/{type}_{context}_{now.strftime("%Y%m-%d%H-%M%S")}.{format}'
+            if save:
+                fig.savefig(filename, format=format, bbox_inches='tight')
+            if upload:
+                with self.logger.experiment.context_manager(context):
+                    self.logger.experiment.log_asset(filename)

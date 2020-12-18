@@ -11,7 +11,7 @@ from src.eval import ClipPlot, PlotIterator, EvaluationModule, MultiLabelStatSco
 
 class ReportEvaluationModule(EvaluationModule):
 
-    def __init__(self, out_dir: str, data_module: DataModule, report: pd.DataFrame, logger, img_format='eps',
+    def __init__(self, out_dir: str, data_module: DataModule, report: pd.DataFrame, logger, img_format=['png'],
                  consensus='max'):
         super().__init__(out_dir, data_module, logger, img_format)
 
