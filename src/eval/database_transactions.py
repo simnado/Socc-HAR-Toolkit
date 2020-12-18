@@ -30,6 +30,9 @@ class Transactions:
     def path(self):
         return f'{self.save_dir}/{self.filename}'
 
+    def verify(self, period_id: str, url: str, label: str):
+        pass
+
     def add(self, period_id: str, label: str, segment: [int]):
         if period_id not in self.insertions:
             self.insertions[period_id] = []

@@ -49,10 +49,10 @@ class ClipPlot:
             self.clip_plot.save(filename,
                                 writer=FFMpegWriter(fps=12, metadata=dict(artist='SoccHAR-32'), bitrate=1800))
         elif format == 'gif':
-            self.clip_plot.save(filename, writer=PillowWriter(fps=12))
+            self.sample_plot.save(filename, writer=PillowWriter(fps=12))
 
         if self.logger:
-            with self.logger.experiment.context_manager("val"):
+            with self.logger.experiment.context_manager(self.info['context']):
                 self.logger.experiment.log_asset(filename,
                                                  metadata={'split': self.info['context'], 'id': self.filename,
                                                            'pred': self.pred})

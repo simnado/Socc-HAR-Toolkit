@@ -124,13 +124,15 @@ class Plotter:
             filename = self.plot.save('svg')
         else:
             filename = self.plot.save('gif')
+            print(f'saved to {filename}')
+            filename = self.plot.save('mp4')
         print(f'saved to {filename}')
 
     def update(self):
         self.prev_btn.disabled = self.is_first
         self.next_btn.disabled = self.is_last
 
-        self.labels.value = ', '.join([key for key, value in self.nearby_actions])
+        self.labels.value = ', '.join([anno['label'] for anno in self.nearby_actions])
 
         self.canvas.value = ''
         self.plot = self.get_plot()
@@ -180,6 +182,10 @@ class Plotter:
         return self.controls.value
 
     @property
+    def meta(self):
+        row = self.indices[self.index]
+        return self.dataset.info[row]
+
+    @property
     def nearby_actions(self):
-        row = int(self.indices[self.index])
-        return [(self.dm.classes[idx], self.dm.classes[idx]) for idx in torch.arange(0, 32)[self.dataset.y[row] > 0] ]
+        return self.meta['annotations']
