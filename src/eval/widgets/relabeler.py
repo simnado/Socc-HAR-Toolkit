@@ -71,7 +71,7 @@ class Relabeler(Plotter):
             start = self.dataset.info[row]['start']
             end = self.dataset.info[row]['end']
             print(self.nearby_actions)
-            annos = [anno for (url, label) in self.nearby_actions if url == self.rl_label.value]
+            annos = [(url, label) for url, label in self.nearby_actions if url == self.rl_label.value]
 
             self.rl_segment.disabled = False
             self.rl_segment.min = 0

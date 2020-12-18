@@ -182,36 +182,20 @@ class HarDataset(Dataset):
             #    frames.append(frame['data'])
             #frames = torch.cat(frames)
             frames, _, _ = io.read_video(video_path, meta['start'], meta['end'], pts_unit='sec')
-            clip_frames = len(frames)
-            assert clip_frames >= self.num_frames
-            resample_idx = torch.linspace(0, clip_frames - 1, self.num_frames_per_sample, dtype=torch.int16).tolist()
-            frames = frames[resample_idx]
-
-        elif self.backend == 'av':
+        else:
             clip_pts = self.video_clips.clips[video_idx][clip_idx]
             start_pts = clip_pts[0].item()
             end_pts = clip_pts[-1].item()
-            frames, _, _ = io.read_video(video_path, start_pts, end_pts)
+            frames, _, _ = io.read_video(video_path, start_pts, end_pts, pts_unit='pts')
             # todo: maybe faster?
             # frames, _, _ = io._video_opt._read_video_from_file(video_path, video_width=224, video_height=224, video_pts_range=(start_pts, end_pts), read_audio_stream=False)
-            resampling_idx = self.video_clips.resampling_idxs[video_idx][clip_idx]
-            if frames.shape[0] == 1:
-                print(f'WARNING: tensor on index={index} has only {frames.shape[0]} frames')
-                frames = torch.cat([frames, frames.clone()])
-            if frames.shape[0] < self.num_frames:
-                print(f'WARNING: tensor on index={index} has only {frames.shape[0]} frames')
-            if isinstance(resampling_idx, torch.Tensor):
-                resampling_idx = resampling_idx - resampling_idx[0]
-                # sometimes the last frame of a clip gets lost. if so repeat last frame at the end
-                resampling_idx[resampling_idx >= len(frames)] = len(frames) - 1
-            frames = frames[resampling_idx]
-            assert frames.shape[0] >= self.num_frames, f'resampled tensor on index={index} has only {frames.shape[0]} frames after resampling of {str(resampling_idx)} indices'
-        else:
-            clip_pts = self.video_clips.resampling_idxs[video_idx][clip_idx]
-            vr = de.VideoReader(video_path, num_threads=1)  # , ctx=de.gpu())
-            frames = vr.get_batch(clip_pts - clip_pts[0] + clip_idx)
-            vr = None
-            del vr
+
+        clip_frames = len(frames)
+        if clip_frames < self.num_frames:
+            print(f'WARNING: tensor on index={index} has only {clip_frames} frames')
+
+        resample_idx = torch.linspace(0, clip_frames - 1, self.num_frames_per_sample, dtype=torch.int16).tolist()
+        frames = frames[resample_idx]
 
         # todo: run on gpu
         # T, H, W, C -> T, C, H, W
