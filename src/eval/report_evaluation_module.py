@@ -128,9 +128,7 @@ class ReportEvaluationModule(EvaluationModule):
         return out
 
     def train_samples_boxplot(self, save=True, upload=True):
-        fig, ax = plt.subplots(dpi=120)
-
-        plt.xticks(rotation=90)
+        fig, ax = plt.subplots(figsize=(5, 10))
 
         ax.set_title(f'train samples per epoch')
 
@@ -138,8 +136,8 @@ class ReportEvaluationModule(EvaluationModule):
                 self.dm.classes]
         occs = occs + [[self._background_occurances('train', epoch) for epoch in range(self.num_epochs)]]
 
-        ax.hlines(self.dm.limit_per_class['train'], -0.5, 33.5, color='grey')
-        ax.boxplot(occs, vert=True, patch_artist=True, labels=self.dm.classes + ['background'])
+        ax.vlines(self.dm.limit_per_class['train'], 0.5, 33.5, color='grey')
+        ax.boxplot(occs, vert=False, labels=self.dm.classes + ['background'])
 
         plt.tight_layout()
         plt.close()

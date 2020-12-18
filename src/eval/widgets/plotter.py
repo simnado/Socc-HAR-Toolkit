@@ -130,7 +130,7 @@ class Plotter:
         self.prev_btn.disabled = self.is_first
         self.next_btn.disabled = self.is_last
 
-        self.labels.value = ', '.join(self.nearby_actions)
+        self.labels.value = ', '.join([key for key, value in self.nearby_actions])
 
         self.canvas.value = ''
         self.plot = self.get_plot()
@@ -182,4 +182,4 @@ class Plotter:
     @property
     def nearby_actions(self):
         row = int(self.indices[self.index])
-        return [self.dm.classes[idx] for idx in torch.arange(0, 32)[self.dataset.y[row] > 0] ]
+        return [(self.dm.classes[idx], self.dm.classes[idx]) for idx in torch.arange(0, 32)[self.dataset.y[row] > 0] ]
