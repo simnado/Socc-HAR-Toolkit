@@ -28,7 +28,7 @@ class Classifier(LightningModule):
         super().__init__()
         self.save_hyperparameters('weight_decay', 'epochs', 'scheduler', 'optim',
                                   'num_frames', 'res', 'fps', 'consensus',
-                                  'trainable_groups',
+                                  'trainable_groups', 'patience',
                                   'pretrained_path', 'mean', 'std')
         self.backbone = backbone
         self.hparams.name = self.backbone.__class__.__name__

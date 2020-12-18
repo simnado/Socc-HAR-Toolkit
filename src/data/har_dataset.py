@@ -3,7 +3,6 @@ from torch.utils.data import Dataset
 from torchvision.datasets.video_utils import VideoClips
 from torchvision import io
 from tqdm.auto import tqdm
-import decord as de
 import numpy as np
 import pandas as pd
 from src.data import DatabaseHandle, VideoTransformation
@@ -23,7 +22,6 @@ class HarDataset(Dataset):
         @param num_frames: number of frame to be sampled
         """
         super()
-        de.bridge.set_bridge('torch')
 
         self.backend = backend
 
