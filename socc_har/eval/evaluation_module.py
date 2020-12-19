@@ -6,9 +6,11 @@ from pathlib import Path
 import torch
 from datetime import datetime
 from sklearn.metrics import ConfusionMatrixDisplay
-from src.data import HarDataset, DataModule, MediaDir
-from src.eval import ClipPlot, PlotIterator
-from src.data.util import OutDir
+
+from ..data.data_module import DataModule
+from .plot.clip_plot import ClipPlot
+from .plot.plot_iterator import PlotIterator
+from ..data.util.out_dir import OutDir
 
 
 class EvaluationModule:

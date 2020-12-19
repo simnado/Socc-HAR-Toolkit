@@ -1,8 +1,7 @@
-import json
-from datetime import datetime
 import os
-from src.data import DatabaseHandle
 import pandas as pd
+
+from ..data.database import DatabaseHandle
 
 
 class Transactions:

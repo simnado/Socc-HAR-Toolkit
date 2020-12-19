@@ -1,11 +1,13 @@
 from typing import Optional
 from matplotlib import pyplot as plt
-from pathlib import Path
 import torch
 import pandas as pd
 import numpy as np
-from src.data import DataModule
-from src.eval import EvaluationModule, MultiLabelStatScores, MultiLabelStatCurves
+
+from ..data.data_module import DataModule
+from .evaluation_module import EvaluationModule
+from .metrics.stat_scores_multiple_labels import MultiLabelStatScores
+from .metrics.stat_curves_multiple_labels import MultiLabelStatCurves
 
 
 class ReportEvaluationModule(EvaluationModule):
