@@ -76,7 +76,7 @@ class Relabeler(Plotter):
         self.on_select(None)
 
     def on_relabel_entity_changed(self, b):
-        if self.rl_label.value and (self.relabel_action == 'add' or self.relabel_action == 'edit' or self.relabel_action == 'pass'):
+        if isinstance(self.rl_label.value, int) and (self.relabel_action == 'add' or self.relabel_action == 'edit' or self.relabel_action == 'pass'):
             self.rl_segment.disabled = self.relabel_action == 'pass'
 
             print(f'index {self.rl_label.value} selected')
@@ -110,11 +110,11 @@ class Relabeler(Plotter):
             annotation_label = self.meta['annotations'][self.rl_label.value]
             self.changelog.value += f'\nVERIFIED {annotation_label["label"]} at {self.rl_segment.value}'
         elif self.relabel_action == 'add':
-            self.transactions.add(self.period.value, self.rl_label.value, self.rl_segment.value)
+            self.transactions.add(self.period.value, self.rl_label.value, list(self.rl_segment.value))
             self.changelog.value += f'\nADD {self.rl_label.value} at {self.rl_segment.value}'
         elif self.relabel_action == 'edit':
             annotation_label = self.meta['annotations'][self.rl_label.value]
-            self.transactions.adjust(self.period.value, annotation_label['url'], annotation_label['label'], annotation_label['segment'], self.rl_segment.value)
+            self.transactions.adjust(self.period.value, annotation_label['url'], annotation_label['label'], annotation_label['segment'], list(self.rl_segment.value))
             self.changelog.value += f'\nEDIT {annotation_label["label"]} at {self.rl_segment.value}'
         elif self.relabel_action == 'delete':
             annotation_label = self.meta['annotations'][self.rl_label.value]

@@ -99,7 +99,7 @@ class ClipPlot:
             color = 'tab:blue'
             if 'verified' in anno:
                 color = 'tab:green'
-            elif 'verified' in anno and 'deleted' in annos and anno['deleted'] == True:
+            if 'verified' in anno and 'deleted' in anno and anno['deleted'] == True:
                 color = 'tab:red'
             anno_dict[anno['label']]['colors'].append(color)
 

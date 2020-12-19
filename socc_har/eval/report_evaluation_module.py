@@ -56,7 +56,7 @@ class ReportEvaluationModule(EvaluationModule):
                 dataset_idx = self.dm.datasets[context].get_row(sample.key, sample.start)
                 rows.append(dataset_idx)
             except KeyError as e:
-                print(f'Error: {str(e)}')
+                print(f'Error: {str(e)} not present in {context} dataset')
                 continue
 
             preds = np.fromstring(sample.scores[1:-1], dtype=float, sep=', ')

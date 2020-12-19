@@ -23,10 +23,13 @@ class DataModule(LightningDataModule):
         self.seed = seed
         self.media_dir = MediaDir(data_dir)
         self.out_dir = OutDir(out_dir)
+        self.allow_critical = False
 
-
-        data_path = self.media_dir.datasets()
-        database_path = DatabaseFetcher.load(database, data_path)
+        if Path(database).exists():
+            database_path = Path(database)
+        else:
+            data_path = self.media_dir.datasets()
+            database_path = DatabaseFetcher.load(database, data_path)
 
         assert database_path.exists(), 'Database does not exist'
 
@@ -86,7 +89,7 @@ class DataModule(LightningDataModule):
                                                 res=self.res, classes=self.classes,
                                                 do_augmentation=True,
                                                 num_frames=self.num_frames, fps=self.fps, clip_offset=self.fps,
-                                                num_chunks=1,
+                                                num_chunks=1, allow_critical=self.allow_critical,
                                                 num_workers=0)
             self.stats['train'] = DataStats('train', self.datasets['train'], self.limit_per_class['train'], seed=self.seed)
             limit = self.limit_per_class['train']
@@ -98,7 +101,7 @@ class DataModule(LightningDataModule):
                                               res=self.res, classes=self.classes,
                                               do_augmentation=False,
                                               num_frames=self.num_frames, fps=self.fps, clip_offset=self.num_frames,
-                                              num_chunks=1,
+                                              num_chunks=1, allow_critical=self.allow_critical,
                                               num_workers=0)
             self.stats['val'] = DataStats('val', self.datasets['val'], self.limit_per_class['val'], seed=self.seed)
 

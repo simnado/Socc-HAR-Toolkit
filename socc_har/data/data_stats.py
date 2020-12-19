@@ -33,7 +33,8 @@ class DataStats:
         # collect actions from annotations
         actions = {cls: 0 for cls in self.dataset.classes}
         for anno in self.dataset.database.get_annotations(self.split):
-            actions[anno['label']] += 1
+            if 'deleted' not in anno or anno['deleted'] == False:
+                actions[anno['label']] += 1
         self.actions = [actions[cls] for cls in self.dataset.classes]
 
         # collect samples from samples

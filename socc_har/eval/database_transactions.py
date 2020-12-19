@@ -15,7 +15,7 @@ class Transactions:
         self.filename = filename
         self.save_dir = save_dir
         self.df = pd.DataFrame(
-            columns=['period_id', 'url', 'src_label', 'src_segment', 'dest_label', 'dest_segment', 'verified', 'deleted', 'operation'])
+            columns=['period_id', 'url', 'src_label', 'src_segment', 'dest_label', 'dest_segment', 'operation'])
 
         if filename and os.path.exists(self.path):
             print(f'loading previous transactions from {filename}')
@@ -49,7 +49,7 @@ class Transactions:
         self._save()
 
     def add(self, period_id: str, label: str, segment: [int]):
-        matches = self.df[(self.df.period_id == period_id) & (self.df.src_segment == segment) & (self.df.dest_label == label)]
+        matches = self.df[(self.df.period_id == period_id) & (self.df.dest_segment.astype(str) == str(segment)) & (self.df.dest_label == label)]
         if len(matches):
             print('this action is already added')
             return
@@ -105,7 +105,7 @@ class Transactions:
 
     def apply(self, database: DatabaseHandle):
 
-        df_left = self.df[True]
+        df_left = self.df.copy()
         for period_id, period_data in database.database.items():
             df = df_left[self.df.period_id == period_id]
             df_left = df_left[~(self.df.period_id == period_id)]
@@ -113,7 +113,7 @@ class Transactions:
 
             for index, row in df.iterrows():
                 if row.operation in ['pass', 'edit', 'delete']:
-                    candidates = [idx for idx, anno in period_annos if anno["url"] == row.url and anno["label"] == row.label]
+                    candidates = [idx for idx, anno in enumerate(period_annos) if anno["url"] == row.url and anno["label"] == row.src_label]
                     assert len(candidates) == 1, f'{len(candidates)} record to update for key={period_id}, url={row.url}, label={row.label}'
                     record = period_annos[candidates[0]]
 
