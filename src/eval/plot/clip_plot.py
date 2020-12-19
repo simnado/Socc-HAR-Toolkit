@@ -9,7 +9,6 @@ from pathlib import Path
 from src.data import HarDataset
 from torchvision.utils import make_grid
 from pytorch_lightning.loggers import LightningLoggerBase
-from IPython.core.display import HTML, Video
 
 
 class ClipPlot:
@@ -95,7 +94,7 @@ class ClipPlot:
             action_duration = anno['segment'][1] - anno['segment'][0]
             if anno['label'] not in anno_dict:
                 anno_dict[anno['label']] = dict(segments=[], colors=[])
-            anno_dict[anno['label']]['segments'].append(anno['segment'][0], action_duration)
+            anno_dict[anno['label']]['segments'].append((anno['segment'][0], action_duration))
             color = 'tab:blue'
             if 'verified' in anno:
                 color = 'tab:green'

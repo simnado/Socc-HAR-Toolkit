@@ -15,20 +15,12 @@ class Transactions:
         """
         self.filename = filename
         self.save_dir = save_dir
-        self.insertions = dict()
-        self.updates = dict()
-        self.deletions = dict()
         self.df = pd.DataFrame(
             columns=['period_id', 'url', 'src_label', 'src_segment', 'dest_label', 'dest_segment', 'verified', 'deleted', 'operation'])
 
         if filename and os.path.exists(self.path):
             print(f'loading previous transactions from {filename}')
-
-            with open(self.path) as json_file:
-                json_file = json.load(json_file)
-                self.insertions = json_file['insertions']
-                self.updates = json_file['updates']
-                self.deletions = json_file['deletions']
+            self.df = pd.read_csv(self.path)
 
     @property
     def path(self):
@@ -41,7 +33,7 @@ class Transactions:
         pass
 
     def verify(self, period_id: str, url: str, label: str, segment: [int]):
-        matches = self.df[(self.df.period_id == period_id) & (self.df.url == url) & (self.df.label == label)]
+        matches = self.df[(self.df.period_id == period_id) & (self.df.url == url) & (self.df.src_label == label)]
         if len(matches):
             print(f'this sample is already verified as {matches.iloc[0].operation}ed')
             return
@@ -58,7 +50,7 @@ class Transactions:
         self._save()
 
     def add(self, period_id: str, label: str, segment: [int]):
-        matches = self.df[(self.df.period_id == period_id) & (self.df.segment == segment) & (self.df.label == label)]
+        matches = self.df[(self.df.period_id == period_id) & (self.df.src_segment == segment) & (self.df.dest_label == label)]
         if len(matches):
             print('this action is already added')
             return
@@ -75,7 +67,7 @@ class Transactions:
         self._save()
 
     def adjust(self, period_id: str, url: str, label: str, src_segment: [int], dest_segment: [int]):
-        matches = self.df[(self.df.period_id == period_id) & (self.df.url == url) & (self.df.label == label)]
+        matches = self.df[(self.df.period_id == period_id) & (self.df.url == url) & (self.df.src_label == label)]
         if len(matches):
             print(f'this sample is already verified as {matches.iloc[0].operation}ed')
             return
@@ -92,7 +84,7 @@ class Transactions:
         self._save()
 
     def remove(self, period_id: str, url: str, label: str, segment: [int]):
-        matches = self.df[(self.df.period_id == period_id) & (self.df.url == url) & (self.df.label == label)]
+        matches = self.df[(self.df.period_id == period_id) & (self.df.url == url) & (self.df.src_label == label)]
         if len(matches):
             print(f'this sample is already verified as {matches.iloc[0].operation}ed')
             return

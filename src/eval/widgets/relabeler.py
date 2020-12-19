@@ -102,7 +102,7 @@ class Relabeler(Plotter):
     def on_relabel(self, b):
         if self.relabel_action == 'pass':
             annotation_label = self.meta['annotations'][self.rl_label.value]
-            self.transactions.verify(self.period.value, annotation_label['url'], annotation_label['label'])
+            self.transactions.verify(self.period.value, annotation_label['url'], annotation_label['label'], annotation_label['segment'])
             annotation_label = self.meta['annotations'][self.rl_label.value]
             self.changelog.value += f'\nVERIFIED {annotation_label["label"]} at {self.rl_segment.value}'
         elif self.relabel_action == 'add':
@@ -110,11 +110,11 @@ class Relabeler(Plotter):
             self.changelog.value += f'\nADD {self.rl_label.value} at {self.rl_segment.value}'
         elif self.relabel_action == 'edit':
             annotation_label = self.meta['annotations'][self.rl_label.value]
-            self.transactions.adjust(self.period.value, annotation_label['url'], annotation_label['label'], self.rl_segment.value)
+            self.transactions.adjust(self.period.value, annotation_label['url'], annotation_label['label'], annotation_label['segment'], self.rl_segment.value)
             self.changelog.value += f'\nEDIT {annotation_label["label"]} at {self.rl_segment.value}'
         elif self.relabel_action == 'delete':
             annotation_label = self.meta['annotations'][self.rl_label.value]
-            self.transactions.remove(self.period.value, annotation_label['url'], annotation_label['label'])
+            self.transactions.remove(self.period.value, annotation_label['url'], annotation_label['label'], annotation_label['segment'])
             self.changelog.value += f'\nDELETE {annotation_label["label"]} at {self.rl_segment.value}'
 
         self.action_buttons.value = 'pass'
