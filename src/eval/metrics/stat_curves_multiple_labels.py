@@ -2,8 +2,7 @@ from typing import Optional, Any
 import torch
 from pytorch_lightning.metrics.metric import Metric
 from pytorch_lightning.metrics.functional.reduction import class_reduce
-from pytorch_lightning.metrics import Accuracy
-from sklearn.metrics import balanced_accuracy_score, roc_auc_score, roc_curve, auc
+from sklearn.metrics import roc_auc_score, roc_curve
 import numpy as np
 
 

@@ -133,7 +133,8 @@ class Plotter:
         self.prev_btn.disabled = self.is_first
         self.next_btn.disabled = self.is_last
 
-        self.labels.value = ', '.join([anno['label'] for anno in self.nearby_actions])
+        non_deleted_lables = [anno['label'] for anno in self.nearby_actions if 'deleted' not in anno or anno['deleted'] == False]
+        self.labels.value = ', '.join(non_deleted_lables)
 
         self.canvas.value = ''
         self.plot = self.get_plot()

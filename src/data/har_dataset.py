@@ -84,7 +84,7 @@ class HarDataset(Dataset):
                 curr_record = records[1]
                 key = keys[1]
 
-            annotations = curr_record['annotations']
+            annotations = [anno for anno in curr_record['annotations'] if 'deleted' not in anno or anno['deleted'] == False]
             period_start = curr_record['segment'][0]
             period_end = curr_record['segment'][1]
 

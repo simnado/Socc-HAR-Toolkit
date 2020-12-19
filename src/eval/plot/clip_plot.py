@@ -94,13 +94,19 @@ class ClipPlot:
         for anno in annos:
             action_duration = anno['segment'][1] - anno['segment'][0]
             if anno['label'] not in anno_dict:
-                anno_dict[anno['label']] = []
-            anno_dict[anno['label']].append((anno['segment'][0], action_duration))
+                anno_dict[anno['label']] = dict(segments=[], colors=[])
+            anno_dict[anno['label']]['segments'].append(anno['segment'][0], action_duration)
+            color = 'tab:blue'
+            if 'verified' in anno:
+                color = 'tab:green'
+            elif 'verified' in anno and 'deleted' in annos and anno['deleted'] == True:
+                color = 'tab:red'
+            anno_dict[anno['label']]['colors'].append(color)
 
         ticks = []
         labels = []
         for idx, (key, val) in enumerate(anno_dict.items()):
-            axes.broken_barh(val, (idx * 10, 9))
+            axes.broken_barh(val['segments'], (idx * 10, 9), facecolors=tuple(val['colors']))
             ticks.append(idx * 10 + 5)
             labels.append(key)
 

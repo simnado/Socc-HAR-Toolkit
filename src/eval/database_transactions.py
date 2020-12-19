@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 import os
 from src.data import DatabaseHandle
+import pandas as pd
 
 
 class Transactions:
@@ -17,11 +18,14 @@ class Transactions:
         self.insertions = dict()
         self.updates = dict()
         self.deletions = dict()
+        self.df = pd.DataFrame(
+            columns=['period_id', 'url', 'src_label', 'src_segment', 'dest_label', 'dest_segment', 'verified', 'deleted', 'operation'])
 
         if filename and os.path.exists(self.path):
-            print('loading previous transactions')
+            print(f'loading previous transactions from {filename}')
 
             with open(self.path) as json_file:
+                json_file = json.load(json_file)
                 self.insertions = json_file['insertions']
                 self.updates = json_file['updates']
                 self.deletions = json_file['deletions']
@@ -30,62 +34,135 @@ class Transactions:
     def path(self):
         return f'{self.save_dir}/{self.filename}'
 
-    def verify(self, period_id: str, url: str, label: str):
+    def integrity_check(self):
+        # for transaction and db (incl subset field)
+        # set 'verified': True,
+        #             'deleted': False,
         pass
 
+    def verify(self, period_id: str, url: str, label: str, segment: [int]):
+        matches = self.df[(self.df.period_id == period_id) & (self.df.url == url) & (self.df.label == label)]
+        if len(matches):
+            print(f'this sample is already verified as {matches.iloc[0].operation}ed')
+            return
+
+        self.df = self.df.append({
+            'period_id': period_id,
+            'url': url,
+            'src_label': label,
+            'dest_label': label,
+            'src_segment': segment,
+            'dest_segment': segment,
+            'operation': 'pass'
+        }, ignore_index=True)
+        self._save()
+
     def add(self, period_id: str, label: str, segment: [int]):
-        if period_id not in self.insertions:
-            self.insertions[period_id] = []
-        self.insertions[period_id].append({
-            "url": datetime.now().strftime('%Y%m-%d%H-%M%S-'),
-            "label": label,
-            "segment": segment
-        })
+        matches = self.df[(self.df.period_id == period_id) & (self.df.segment == segment) & (self.df.label == label)]
+        if len(matches):
+            print('this action is already added')
+            return
+
+        self.df = self.df.append({
+            'period_id': period_id,
+            'url': None,
+            'src_label': None,
+            'dest_label': label,
+            'src_segment': None,
+            'dest_segment': segment,
+            'operation': 'add'
+        }, ignore_index=True)
         self._save()
 
-    def adjust(self, period_id: str, url: str, label: str, segment: [int]):
-        if period_id not in self.updates:
-            self.updates[period_id] = []
-        self.updates[period_id].append({
-                "url": url,
-                "label": label,
-                "segment": segment  # only segment will be updated
-        })
+    def adjust(self, period_id: str, url: str, label: str, src_segment: [int], dest_segment: [int]):
+        matches = self.df[(self.df.period_id == period_id) & (self.df.url == url) & (self.df.label == label)]
+        if len(matches):
+            print(f'this sample is already verified as {matches.iloc[0].operation}ed')
+            return
+
+        self.df = self.df.append({
+            'period_id': period_id,
+            'url': url,
+            'src_label': label,
+            'dest_label': label,
+            'src_segment': src_segment,
+            'dest_segment': dest_segment,
+            'operation': 'edit'
+        }, ignore_index=True)
         self._save()
 
-    def remove(self, period_id: str, url: str, label: str):
-        if period_id not in self.deletions:
-            self.deletions[period_id] = []
-        self.deletions[period_id].append(dict(url=url, label=label))
+    def remove(self, period_id: str, url: str, label: str, segment: [int]):
+        matches = self.df[(self.df.period_id == period_id) & (self.df.url == url) & (self.df.label == label)]
+        if len(matches):
+            print(f'this sample is already verified as {matches.iloc[0].operation}ed')
+            return
+
+        self.df = self.df.append({
+            'period_id': period_id,
+            'url': url,
+            'src_label': label,
+            'dest_label': None,
+            'src_segment': segment,
+            'dest_segment': None,
+            'operation': 'delete'
+        }, ignore_index=True)
         self._save()
 
     def _save(self):
-        with open(self.path, 'w') as f:
-            json.dump(dict(insertions=self.insertions, updates=self.updates, deletions=self.deletions), f)
+        self.integrity_check()
+        self.df.to_csv(self.path)
 
     def apply(self, database: DatabaseHandle):
 
-        for k, v in database.database.items():
-            if k in self.updates:
-                for update in self.updates[k]:
-                    candidates = [idx for idx, record in database.database[k] if record["url"] == update["url"] and record["label"] == update["label"]]
-                    if len(candidates) == 0:
-                        print(f'no record to update for key={k}, url={update["url"]}, label={update["label"]}')
+        df_left = self.df[True]
+        for period_id, period_data in database.database.items():
+            df = df_left[self.df.period_id == period_id]
+            df_left = df_left[~(self.df.period_id == period_id)]
+            period_annos = period_data['annotations']
+
+            for index, row in df.iterrows():
+                if row.operation in ['pass', 'edit', 'delete']:
+                    candidates = [idx for idx, anno in period_annos if anno["url"] == row.url and anno["label"] == row.label]
+                    assert len(candidates) == 1, f'{len(candidates)} record to update for key={period_id}, url={row.url}, label={row.label}'
+                    record = period_annos[candidates[0]]
+
+                    if row.operation == 'pass':
+                        assert record['segment'] == row.src_segment == row.dest_segment
+                        record['verified'] = True
+                        record['deleted'] = False
+                    elif row.operation == 'edit':
+                        assert record['segment'] == row.src_segment
+                        if 'source' not in record:
+                            # store original segment from SBOD, only the first time
+                            record['source'] = {'segment': row.src_segment}
+                        record['segment'] = row.dest_segment
+                        record['verified'] = True
+                        record['deleted'] = False
+                    elif row.operation == 'delete':
+                        assert record['segment'] == row.src_segment
+                        assert row.dest_segment is None
+                        assert row.dest_label is None
+                        record['verified'] = True
+                        record['deleted'] = True
                     else:
-                        # update segment
-                        database.database[k]["annotations"][candidates[0]]["segment"] = update["segment"]
-            if k in self.deletions:
-                for deletion in self.deletions[k]:
-                    candidates = [idx for idx, record in database.database[k] if record["url"] == deletion["url"] and record["label"] == deletion["label"]]
-                    if len(candidates) == 0:
-                        print(f'no record to delete for key={k}, url={deletion["url"]}, label={deletion["label"]}')
-                    else:
-                        # delete record
-                        database.database[k]["annotations"].pop(candidates[0])
-            if k in self.insertions:
-                for insertion in self.insertions[k]:
-                    # add record
-                    database.database[k]["annotations"].append(insertion)
+                        raise RuntimeError('Invalid state')
+                elif row.operation == 'add':
+                    period_annos.append({
+                        "url": None,
+                        "label": row.dest_label,
+                        "segment": row.dest_segment,
+                        "verified": True,
+                        "deleted": False
+                    })
+                else:
+                    raise RuntimeError('Invalid state')
 
             # sort entries by segement
-            database.database[k]["annotations"] = sorted(database.database[k]["annotations"], key=lambda x: x['segemnt'][0], reverse=False)
+            database.database[period_id]["annotations"] = sorted(period_annos, key=lambda x: x['segment'][0], reverse=False)
+
+        assert len(df_left) == 0, f'{len(df_left)} samples left unprocessed'
+
+    def clear(self):
+        self.df = pd.DataFrame(
+            columns=['period_id', 'url', 'src_label', 'src_segment', 'dest_label', 'dest_segment', 'verified',
+                     'deleted', 'operation'])
