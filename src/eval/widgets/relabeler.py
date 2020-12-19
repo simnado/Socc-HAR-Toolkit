@@ -1,10 +1,10 @@
 from pathlib import Path
 from IPython.display import display
 import ipywidgets as widgets
-from src.data import DataModule
-from src.eval import ClipPlot, Plotter, Transactions, ReportEvaluationModule
 from pytorch_lightning.loggers import LightningLoggerBase
 import pandas as pd
+from src.data import DataModule
+from src.eval import Transactions, ClipPlot, Plotter, ReportEvaluationModule
 
 
 class Relabeler(Plotter):

@@ -6,9 +6,9 @@ from matplotlib.animation import FFMpegWriter, PillowWriter
 import numpy as np
 from celluloid import Camera
 from pathlib import Path
-from src.data import HarDataset
 from torchvision.utils import make_grid
 from pytorch_lightning.loggers import LightningLoggerBase
+from src.data import HarDataset
 
 
 class ClipPlot:

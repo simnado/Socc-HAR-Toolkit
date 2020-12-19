@@ -1,10 +1,10 @@
 from pathlib import Path
 from IPython.display import display
 import ipywidgets as widgets
-from src.data import DataModule
-from src.eval import ClipPlot
 from pytorch_lightning.loggers import LightningLoggerBase
 import torch
+from src.data import DataModule
+from src.eval import ClipPlot
 
 
 class Plotter:
