@@ -179,7 +179,7 @@ class Classifier(LightningModule):
         # todo: is this a problem? batch_loss = losses.mean()
         batch_loss = self.loss(out, y)
 
-        assert batch_loss.item() > 0
+        assert batch_loss > 0, f'batch loss is {batch_loss.item()}'
         scores = torch.sigmoid(out)
 
         self.train_stat_scores(scores, y)

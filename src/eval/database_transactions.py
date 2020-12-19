@@ -51,6 +51,7 @@ class Transactions:
                 "label": label,
                 "segment": segment  # only segment will be updated
         })
+        self._save()
 
     def remove(self, period_id: str, url: str, label: str):
         if period_id not in self.deletions:
