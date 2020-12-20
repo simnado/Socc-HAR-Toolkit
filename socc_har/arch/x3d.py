@@ -29,7 +29,7 @@ class X3D_S(X3D):
             backbone=dict(
                 type='X3D',
                 pretrained=None,
-                gamma_w=1,
+                gamma_w=2,
                 gamma_b=2.25,
                 gamma_d=2.2,
                 norm_cfg=dict(type='BN3d', requires_grad=True),
@@ -37,7 +37,7 @@ class X3D_S(X3D):
             ),
             cls_head=dict(
                 type='X3DHead',
-                in_channels=432,
+                in_channels=2048,
                 num_classes=num_classes,
                 spatial_type='avg',
                 dropout_ratio=0.5,
@@ -61,13 +61,13 @@ class X3D_M(X3D):
             backbone=dict(
                 type='X3D',
                 pretrained=None,
-                gamma_w=1,
+                gamma_w=2,
                 gamma_b=2.25,
                 gamma_d=2.2
             ),
             cls_head=dict(
                 type='X3DHead',
-                in_channels=432,
+                in_channels=2048,
                 num_classes=num_classes,
                 spatial_type='avg',
                 dropout_ratio=0.5,
@@ -89,13 +89,13 @@ class X3D_L(X3D):
             backbone=dict(
                 type='X3D',
                 pretrained=None,
-                gamma_w=1,
+                gamma_w=2,
                 gamma_b=2.25,
-                gamma_d=2.2
+                gamma_d=5.0
             ),
             cls_head=dict(
                 type='X3DHead',
-                in_channels=432,
+                in_channels=2048,
                 num_classes=num_classes,
                 spatial_type='avg',
                 dropout_ratio=0.5,
