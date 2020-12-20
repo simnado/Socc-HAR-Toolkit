@@ -138,8 +138,8 @@ class Relabeler(Plotter):
         start = self.meta['start']
         end = self.meta['end']
         self.rl_segment.min = 0
-        self.rl_segment.max = end + 1
-        self.rl_segment.min = start - 1
+        self.rl_segment.max = end + 2
+        self.rl_segment.min = start - 2
 
     def get_plot(self):
         return ClipPlot(self.logger, dataset=self.dataset, context=self.set_select.value, row=self.indices[self.index],

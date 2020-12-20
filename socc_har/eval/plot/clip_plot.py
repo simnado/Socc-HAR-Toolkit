@@ -185,6 +185,7 @@ class ClipPlot:
         for idx, img in enumerate(x):
             sample_ax.set_title(self.title)
             sample_ax.imshow(img)
+            sample_ax.grid(False)
 
             self._annotation_plot(anno_ax, idx/(len(x) -1))
             if self.pred is not None:
