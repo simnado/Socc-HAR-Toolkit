@@ -113,7 +113,7 @@ class ReportEvaluationModule(EvaluationModule):
             df = self.report
             df = df[(df.subset == split) & (df.epoch == epoch)]
         y = df.y.tolist()
-        y = [np.fromstring(score[1:-1], sep=', ') for score in y]
+        #y = [np.fromstring(score[1:-1], sep=', ') for score in y]
         y = torch.Tensor(y)
         return y
 
@@ -124,7 +124,7 @@ class ReportEvaluationModule(EvaluationModule):
             df = self.report
             df = df[(df.subset == split) & (df.epoch == epoch)]
         out = df.scores.tolist()
-        out = [np.fromstring(score[1:-1], sep=', ') for score in out]
+        #out = [np.fromstring(score[1:-1], sep=', ') for score in out]
         out = torch.Tensor(out)
         return out
 
@@ -261,9 +261,12 @@ class ReportEvaluationModule(EvaluationModule):
 
     def get_scalars(self, save=True, upload=False):
 
-        splits = ['train', 'val', 'test']
-        if self.num_test_runs == 0:
-            splits.pop()
+        splits = []
+        if self.num_epochs:
+            splits = ['train', 'val']
+
+        if self.num_test_runs:
+            splits.append('test')
 
         scalars: Optional[MultiLabelStatScores] = None
         curve: Optional[MultiLabelStatCurves] = None
@@ -315,10 +318,7 @@ class ReportEvaluationModule(EvaluationModule):
             if upload:
                 self.logger.log_metrics(metrics)
 
-        df = pd.DataFrame({'train': values['train'],
-                           'val': values['val'],
-                           'test': values['test']
-                           }, index=labels)
+        df = pd.DataFrame({split: values[split] for split in splits}, index=labels)
         df.plot.barh(stacked=False, title='scalar metrics by subset', ax=ax)
 
         plt.tight_layout()

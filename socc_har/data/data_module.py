@@ -18,7 +18,8 @@ class DataModule(LightningDataModule):
                  metadata_path: Optional[str],
                  batch_size=32,
                  classes=None, max_train_samples_per_class=500,
-                 num_data_workers=None, seed=2147483647):
+                 num_data_workers=None, seed=2147483647,
+                 test_duration=6, num_test_crops=5, num_test_frames=None):
         super().__init__()
         self.seed = seed
         self.media_dir = MediaDir(data_dir)
@@ -40,6 +41,12 @@ class DataModule(LightningDataModule):
         self.num_frames = num_frames
         self.res = res
         self.fps = fps
+
+        self.test_duration = test_duration
+        self.num_test_crops = num_test_crops
+        self.num_test_frames = num_test_frames
+        if num_test_frames is None:
+            self.num_test_frames = self.num_frames
 
         self.classes = classes
 
@@ -111,9 +118,12 @@ class DataModule(LightningDataModule):
                                                video_metadata=self.video_metadata['test'],
                                                res=self.res, classes=self.classes,
                                                do_augmentation=False,
-                                               # 10 sec clips, no overlap
-                                               num_frames=self.num_frames, fps=self.fps, clip_offset=self.fps * 10,
-                                               num_chunks=5, num_frames_per_sample=self.fps * 10,
+                                               # 6 sec clips, no overlap
+                                               num_frames=self.num_test_frames,
+                                               fps=self.fps,
+                                               clip_offset=self.fps * self.test_duration,
+                                               num_chunks=self.num_test_crops,
+                                               num_frames_per_sample=self.fps * self.test_duration,
                                                allow_critical=True,
                                                num_workers=0)
             self.stats['test'] = DataStats('test', self.datasets['test'], self.limit_per_class['test'], seed=self.seed)

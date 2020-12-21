@@ -77,6 +77,7 @@ class Classifier(LightningModule):
 
         # todo: data layer
 
+        # todo: looks in-efficient: no for-loops
         # transforms
         for batch in range(batch_size):
             for chunk in range(num_chunks):
@@ -258,7 +259,12 @@ class Classifier(LightningModule):
             self.test_stat_curves.reset()
 
         x, y, info = batch
-        assert x.shape[0] <= self.test_bs
+
+        batches, crops, channels, frames, width, height = x.size()
+
+        if batch_idx == 0:
+            print(f'input shape is {str(x.shape)}')
+            assert batches <= self.hparams['batch_size']
 
         out = self(x)
         losses = self.reportLoss(out, y)
@@ -326,10 +332,6 @@ class Classifier(LightningModule):
         assert 64 % max_bs == 0
 
         return max_bs
-
-    @property
-    def test_bs(self):
-        return max(1, self.hparams.batch_size // 5)
 
     @property
     def accumulate_grad_batches(self):
