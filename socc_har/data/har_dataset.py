@@ -14,7 +14,7 @@ class HarDataset(Dataset):
                  do_augmentation=False,
                  num_frames=32, num_frames_per_sample=None, num_chunks=1, fps=15,
                  clip_offset=None,
-                 background_min_distance=3, period_max_distance=10, min_action_overlap=0.99, allow_critical=False,
+                 background_min_distance=3, period_max_distance=10, min_action_overlap=0.9, allow_critical=False,
                  num_workers=4, backend='av'):
         """
         Initializes a dataset
