@@ -12,4 +12,5 @@ mmaction_root/
 */**/__pycache__
 notebooks/consensus
 notebooks/verifications
+notebooks/stats
 data/datasets

@@ -67,9 +67,6 @@ class EvaluationModule:
             samples = torch.sum(torch.tensor([self.dm.stats[context].samples for context in ['train', 'val', 'test']]), dim=0)
             resamples = torch.sum(torch.stack([self.dm.stats[context].resamples + [self.dm.stats[context].background_resamples] for context in ['train', 'val', 'test']]), dim=0)
 
-        if context == 'test':
-            resamples = samples
-
         labels = self.dm.classes + ['background']
         order = torch.argsort(torch.Tensor(samples), descending=False).tolist()
         df = pd.DataFrame({

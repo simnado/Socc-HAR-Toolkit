@@ -107,8 +107,11 @@ class DataModule(LightningDataModule):
                                               video_metadata=self.video_metadata['val'],
                                               res=self.res, classes=self.classes,
                                               do_augmentation=False,
-                                              num_frames=self.num_frames, fps=self.fps, clip_offset=self.num_frames,
-                                              num_chunks=1, allow_critical=self.allow_critical,
+                                              num_frames=self.num_frames,
+                                              fps=self.fps,
+                                              clip_offset=self.num_frames,
+                                              num_chunks=1,
+                                              allow_critical=self.allow_critical,
                                               num_workers=0)
             self.stats['val'] = DataStats('val', self.datasets['val'], self.limit_per_class['val'], seed=self.seed)
 
@@ -149,9 +152,9 @@ class DataModule(LightningDataModule):
     def test_dataloader(self):
         assert "test" in self.datasets, "No TestSet build, run setup('test')"
 
-        # sampler = SubsetRandomSampler(self.indices["test"])
+        sampler = SubsetRandomSampler(self.stats["test"].indices)
         dl = DataLoader(self.datasets["test"], batch_size=self.batch_size, num_workers=self.num_data_workers,
-                        collate_fn=self.collate, shuffle=False)
+                        sampler=sampler, collate_fn=self.collate, shuffle=False)
 
         return dl
 

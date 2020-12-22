@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 import torch
 import pandas as pd
 import numpy as np
+from sklearn.decomposition import PCA
 
 from ..data.data_module import DataModule
 from .evaluation_module import EvaluationModule
@@ -254,12 +255,10 @@ class ReportEvaluationModule(EvaluationModule):
         plt.tight_layout()
         plt.close()
 
-        print(metrics)
-
         if upload == True:
             self.logger.log_metrics(metrics)
         self._handle(fig, 'train', f'samples', save, upload)
-        return fig
+        return fig, metrics
 
     def get_scalars(self, save=True, upload=False):
 
@@ -331,8 +330,8 @@ class ReportEvaluationModule(EvaluationModule):
     def get_scalar_by_class(self, split: str, metric: str, save=True, upload=False):
         scalars: Optional[MultiLabelStatScores] = None
         curve: Optional[MultiLabelStatCurves] = None
-        fig, ax = plt.subplots(dpi=120)
-        title = f'{metric} by class'
+        fig, ax = plt.subplots(figsize=(6,8))
+        title = f'{metric}_by_class'
 
         if split == 'train':
             self._init_train_curve()
@@ -352,16 +351,16 @@ class ReportEvaluationModule(EvaluationModule):
 
         metric_fn = getattr(scalars, metric) if metric != 'auroc' else curve.auroc
         scalars = metric_fn('none')
-        order = torch.argsort(torch.Tensor(scalars), descending=False).tolist()
         metrics = dict()
 
-        for idx in order:
+        for idx in range(self.dm.num_classes):
             cls = self.dm.classes[idx]
             metrics[f'{split}_{metric}_{cls}'] = scalars[idx]
 
         values = [float(value) for key, value in metrics.items()]
-        classes = [self.dm.classes[idx] for idx in order]
-        df = pd.DataFrame({split: values}, index=classes)
+        classes = [self.dm.classes[idx] for idx in range(self.dm.num_classes)]
+
+        df = pd.DataFrame({split: values}, index=classes).sort_values(by=[split])
         df.plot.barh(stacked=False, title=title, ax=ax, legend=False)
 
         if upload:
@@ -369,11 +368,40 @@ class ReportEvaluationModule(EvaluationModule):
 
         plt.tight_layout()
         plt.close()
-        self._handle(fig, 'train', title, save, upload)
-        return fig
+        self._handle(fig, split, title, save, upload)
+        return fig, metrics
 
-    def cluster_classes_by_metrics(self, split: str, save=True, upload=False):
-        pass
+    def get_pca_by_class(self, split: str, save=True, upload=False):
+        metric_cube = torch.zeros((32, 5))
+
+        _, ba = self.get_scalar_by_class(split, 'balanced_accuracy', False)
+        _, f1 = self.get_scalar_by_class(split, 'f1', False)
+        _, pr = self.get_scalar_by_class(split, 'precision', False)
+        _, re = self.get_scalar_by_class(split, 'recall', False)
+        _, au = self.get_scalar_by_class(split, 'auroc', False)
+
+        metric_cube[:, 0] = torch.stack(list(ba.values()))
+        metric_cube[:, 1] = torch.stack(list(f1.values()))
+        metric_cube[:, 2] = torch.stack(list(pr.values()))
+        metric_cube[:, 3] = torch.stack(list(re.values()))
+        metric_cube[:, 4] = torch.FloatTensor(list(au.values()))
+
+        pca = PCA(n_components=1)
+        pca.fit(metric_cube)
+
+        components = torch.Tensor(torch.Tensor(pca.components_)[0, :])  #
+        projection = torch.matmul(metric_cube, components)
+        projection.size()
+
+        fig, ax = plt.subplots(figsize=(6, 8))
+        metrics = {'pca_0': projection}
+        PCA_df = pd.DataFrame(metrics, index=self.dm.classes).sort_values(by=['pca_0'], ascending=True)
+        PCA_df.plot.barh(ax=ax, legend=False, title='PCA-0')
+
+        plt.tight_layout()
+        plt.close()
+        self._handle(fig, split, f'PCA_by_class', save, upload)
+        return fig, metrics
 
     def get_threshold_by_metric(self, split: str, metric: str, reduction: str, save=True, upload=False):
         fig, ax = plt.subplots(dpi=120)
@@ -391,13 +419,14 @@ class ReportEvaluationModule(EvaluationModule):
         ax.plot(x, metrics, color=color)
         ax.plot(x[peak], metrics[peak], color=color, marker='o')
 
+        metrics = {f'threshold_by_{metric}_{reduction}': x[peak]}
         if upload:
-            self.logger.log_metrics({f'threshold_by_{metric}_{reduction}': x[peak]})
+            self.logger.log_metrics(metrics)
 
         plt.tight_layout()
         plt.close()
         self._handle(fig, split, f'threshold by {reduction} {metric}', save, upload)
-        return fig
+        return fig, metrics
 
     def get_metrics_by_consensus(self, save=True, upload=False):
         fig, ax = plt.subplots(dpi=120)
