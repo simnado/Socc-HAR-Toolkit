@@ -127,11 +127,14 @@ class PreProcessing:
         else:
             print(f'all videos found')
 
-        metadata_out_path = self.out_dir.metadata(datetime.now())
-        torch.save(video_metadata, metadata_out_path)
-        print(f'video metadata saved to `{metadata_out_path}`')
-
         return video_metadata
+
+    def save(self):
+        if not self.video_metadata:
+            print('no metadata loaded. run .prepare_data()')
+        metadata_out_path = self.out_dir.metadata(datetime.now())
+        torch.save(self.video_metadata, metadata_out_path)
+        print(f'video metadata saved to `{metadata_out_path}`')
 
     def reanalyze(self, split: str, key: str):
         idx = [idx for idx, keys in enumerate(self.video_metadata[split]['sac_keys']) if key in keys]
