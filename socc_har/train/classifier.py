@@ -70,9 +70,9 @@ class Classifier(LightningModule):
     def forward(self, x):
         batch_size, num_chunks, channels, frames, width, height = x.size()
 
-        assert num_chunks <= 5
+        assert num_chunks >= 1
         assert channels == 3
-        assert frames == self.hparams.num_frames
+        assert frames >= self.hparams.num_frames  # allow more for testing
         assert width == height
 
         # todo: data layer

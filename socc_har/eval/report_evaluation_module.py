@@ -113,7 +113,8 @@ class ReportEvaluationModule(EvaluationModule):
             df = self.report
             df = df[(df.subset == split) & (df.epoch == epoch)]
         y = df.y.tolist()
-        #y = [np.fromstring(score[1:-1], sep=', ') for score in y]
+        if type(y[0]) == str:
+            y = [np.fromstring(score[1:-1], sep=', ') for score in y]
         y = torch.Tensor(y)
         return y
 
@@ -124,7 +125,8 @@ class ReportEvaluationModule(EvaluationModule):
             df = self.report
             df = df[(df.subset == split) & (df.epoch == epoch)]
         out = df.scores.tolist()
-        #out = [np.fromstring(score[1:-1], sep=', ') for score in out]
+        if type(out[0]) == str:
+            out = [np.fromstring(score[1:-1], sep=', ') for score in out]
         out = torch.Tensor(out)
         return out
 
@@ -324,7 +326,7 @@ class ReportEvaluationModule(EvaluationModule):
         plt.tight_layout()
         plt.close()
         self._handle(fig, 'train', f'scalars per subset', save, upload)
-        return fig
+        return fig, values
 
     def get_scalar_by_class(self, split: str, metric: str, save=True, upload=False):
         scalars: Optional[MultiLabelStatScores] = None
