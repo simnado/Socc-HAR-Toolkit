@@ -14,8 +14,13 @@ from .metrics.stat_curves_multiple_labels import MultiLabelStatCurves
 class ReportEvaluationModule(EvaluationModule):
 
     def __init__(self, out_dir: str, data_module: DataModule, report: pd.DataFrame, logger, img_format=['png'],
-                 consensus='max'):
+                 consensus='max', class_idxs=None):
         super().__init__(out_dir, data_module, logger, img_format)
+
+        self.class_idxs = class_idxs
+        if class_idxs is None:
+            self.class_idxs = [idx for idx in range(self.dm.num_classes)]
+        self.classes = [self.dm.classes[idx] for idx in self.class_idxs]
 
         assert consensus in ['max', 'avg']
 
@@ -117,6 +122,7 @@ class ReportEvaluationModule(EvaluationModule):
         if type(y[0]) == str:
             y = [np.fromstring(score[1:-1], sep=', ') for score in y]
         y = torch.Tensor(y)
+        y = y[:,self.class_idxs]
         return y
 
     def _get_scores(self, split: str, epoch: int):
@@ -129,6 +135,7 @@ class ReportEvaluationModule(EvaluationModule):
         if type(out[0]) == str:
             out = [np.fromstring(score[1:-1], sep=', ') for score in out]
         out = torch.Tensor(out)
+        out = out[:,self.class_idxs]
         return out
 
     def train_samples_boxplot(self, save=True, upload=True):
@@ -137,11 +144,11 @@ class ReportEvaluationModule(EvaluationModule):
         ax.set_title(f'train samples per epoch')
 
         occs = [[self._label_occurances('train', epoch, label) for epoch in range(self.num_epochs)] for label in
-                self.dm.classes]
+                self.classes]
         occs = occs + [[self._background_occurances('train', epoch) for epoch in range(self.num_epochs)]]
 
         ax.vlines(self.dm.limit_per_class['train'], 0.5, 33.5, color='grey')
-        ax.boxplot(occs, vert=False, labels=self.dm.classes + ['background'])
+        ax.boxplot(occs, vert=False, labels=self.classes + ['background'])
 
         plt.tight_layout()
         plt.close()
@@ -152,36 +159,36 @@ class ReportEvaluationModule(EvaluationModule):
 
     def _init_train_scalars(self, epoch: int):
         if self.train_scalars[epoch] is None:
-            scalars = MultiLabelStatScores(self.dm.num_classes, threshold=0.5)
+            scalars = MultiLabelStatScores(len(self.class_idxs), threshold=0.5)
             scalars(self._get_scores('train', epoch), self._get_y('train', epoch))
             self.train_scalars[epoch] = scalars
 
-            scalars = MultiLabelStatScores(self.dm.num_classes, threshold=0.5)
+            scalars = MultiLabelStatScores(len(self.class_idxs), threshold=0.5)
             scalars(self._get_scores('val', epoch), self._get_y('val', epoch))
             self.val_scalars[epoch] = scalars
 
     def _init_test_scalars(self, threshold: int):
         assert -1 < threshold < 101
         if self.test_scalars[threshold] is None:
-            scalars = MultiLabelStatScores(self.dm.num_classes, threshold=threshold / 100.0)
+            scalars = MultiLabelStatScores(len(self.class_idxs), threshold=threshold / 100.0)
             scalars(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
             self.test_scalars[threshold] = scalars
 
     def _init_train_curve(self):
         if self.train_curve is None:
-            curve = MultiLabelStatCurves(self.dm.num_classes)
+            curve = MultiLabelStatCurves(len(self.class_idxs))
             curve(self._get_scores('train', self.num_epochs - 1), self._get_y('train', self.num_epochs - 1))
             self.train_curve = curve
 
     def _init_val_curve(self):
         if self.val_curve is None:
-            curve = MultiLabelStatCurves(self.dm.num_classes)
+            curve = MultiLabelStatCurves(len(self.class_idxs))
             curve(self._get_scores('val', self.num_epochs - 1), self._get_y('val', self.num_epochs - 1))
             self.val_curve = curve
 
     def _init_test_curve(self):
         if self.test_curve is None:
-            curve = MultiLabelStatCurves(self.dm.num_classes)
+            curve = MultiLabelStatCurves(len(self.class_idxs))
             curve(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
             self.test_curve = curve
 
@@ -226,7 +233,7 @@ class ReportEvaluationModule(EvaluationModule):
             self._init_test_curve()
             curve = self.test_curve
 
-        curves = getattr(curve, metric)(['micro', 'macro'], [i for i in range(len(self.dm.classes))])
+        curves = getattr(curve, metric)(['micro', 'macro'], [i for i in range(len(self.classes))])
         fig, ax = plt.subplots(dpi=120)
         ax.set_title(f'{metric}')
         ax.set_xlabel('false-positive rate (fpr)')
@@ -234,8 +241,8 @@ class ReportEvaluationModule(EvaluationModule):
 
         ax.plot([0, 1], [0, 1], linestyle='--')
 
-        labels = reductions + self.dm.classes
-        keys = reductions + [i for i in range(self.dm.num_classes)]
+        labels = reductions + self.classes
+        keys = reductions + [i for i in range(len(self.class_idxs))]
 
         metrics = {}
         for idx, key in enumerate(keys):
@@ -353,12 +360,12 @@ class ReportEvaluationModule(EvaluationModule):
         scalars = metric_fn('none')
         metrics = dict()
 
-        for idx in range(self.dm.num_classes):
-            cls = self.dm.classes[idx]
+        for idx, cls in enumerate(self.classes):
+            print(cls)
             metrics[f'{split}_{metric}_{cls}'] = scalars[idx]
 
         values = [float(value) for key, value in metrics.items()]
-        classes = [self.dm.classes[idx] for idx in range(self.dm.num_classes)]
+        classes = [self.classes[idx] for idx in range(len(self.class_idxs))]
 
         df = pd.DataFrame({split: values}, index=classes).sort_values(by=[split])
         df.plot.barh(stacked=False, title=title, ax=ax, legend=False)
@@ -372,7 +379,7 @@ class ReportEvaluationModule(EvaluationModule):
         return fig, metrics
 
     def get_pca_by_class(self, split: str, save=True, upload=False):
-        metric_cube = torch.zeros((32, 5))
+        metric_cube = torch.zeros((len(self.class_idxs), 5))
 
         _, ba = self.get_scalar_by_class(split, 'balanced_accuracy', False)
         _, f1 = self.get_scalar_by_class(split, 'f1', False)
@@ -395,7 +402,7 @@ class ReportEvaluationModule(EvaluationModule):
 
         fig, ax = plt.subplots(figsize=(6, 8))
         metrics = {'pca_0': projection}
-        PCA_df = pd.DataFrame(metrics, index=self.dm.classes).sort_values(by=['pca_0'], ascending=True)
+        PCA_df = pd.DataFrame(metrics, index=self.classes).sort_values(by=['pca_0'], ascending=True)
         PCA_df.plot.barh(ax=ax, legend=False, title='PCA-0')
 
         plt.tight_layout()
@@ -435,9 +442,9 @@ class ReportEvaluationModule(EvaluationModule):
         metrics = dict()
 
         self.consensus = 'max'
-        curve = MultiLabelStatCurves(self.dm.num_classes)
+        curve = MultiLabelStatCurves(len(self.class_idxs))
         curve(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
-        scalars = MultiLabelStatScores(self.dm.num_classes, threshold=50 / 100.0)
+        scalars = MultiLabelStatScores(len(self.class_idxs), threshold=50 / 100.0)
         scalars(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
         metrics['max'] = {
             f'test_balanced_accuracy_macro_{self.consensus}_consensus': float(scalars.balanced_accuracy('macro')),
@@ -449,9 +456,9 @@ class ReportEvaluationModule(EvaluationModule):
         }
 
         self.consensus = 'avg'
-        curve = MultiLabelStatCurves(self.dm.num_classes)
+        curve = MultiLabelStatCurves(len(self.class_idxs))
         curve(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
-        scalars = MultiLabelStatScores(self.dm.num_classes, threshold=50 / 100.0)
+        scalars = MultiLabelStatScores(len(self.class_idxs), threshold=50 / 100.0)
         scalars(self._get_scores('test', self.last_test_epoch), self._get_y('test', self.last_test_epoch))
         metrics['avg'] = {
             f'test_balanced_accuracy_macro_{self.consensus}_consensus': float(scalars.balanced_accuracy('macro')),
