@@ -154,7 +154,7 @@ class DataModule(LightningDataModule):
 
         sampler = SubsetRandomSampler(self.stats["test"].indices)
         dl = DataLoader(self.datasets["test"], batch_size=self.batch_size, num_workers=self.num_data_workers,
-                        sampler=sampler, collate_fn=self.collate, shuffle=False)
+                        collate_fn=self.collate, shuffle=False)
 
         return dl
 

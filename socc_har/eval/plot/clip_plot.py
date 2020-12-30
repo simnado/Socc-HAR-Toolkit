@@ -53,7 +53,7 @@ class ClipPlot:
 
         if self.logger:
             with self.logger.experiment.context_manager(self.info['context']):
-                self.logger.experiment.log_asset(filename,
+                self.logger.experiment.log_asset(str(filename),
                                                  metadata={'split': self.info['context'], 'id': self.filename,
                                                            'pred': self.pred})
 
