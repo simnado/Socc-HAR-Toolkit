@@ -8,6 +8,8 @@ phase_1 = dict(
     SlowFast_8x8_backbone='narendorf/soccar-32-ph1/b703c8fee3af4817ab347839901e0165',
     SlowFast_4x16_backbone='narendorf/soccar-32-ph1/e00640bb078a4dc4bdb451fd2da49afb',
     ir_CSN_4g_backbone='narendorf/soccar-32-ph1/822944fc50984cc99ee96586ec15e9f1',
+
+    ir_CSN_verified='narendorf/soccar-32-ph1/578effe0da8e4aaa89f60eeaa3a0b55e'
 )
 
 phase_2 = dict(
