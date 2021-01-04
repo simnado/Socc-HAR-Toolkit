@@ -13,15 +13,16 @@ phase_1 = dict(
 )
 
 phase_2 = dict(
-    R2plus1D_34_32_2='narendorf/soccar-32-ph1/4488f5f18d7e438aad586eaa348edd60',
-    R2plus1D_34_64_1='narendorf/soccar-32-ph1/5517708f1c684506ae5afca3bb50e63e',
-    R2plus1D_34_48_2='narendorf/soccar-32-ph1/245fa59c071947d2a5b071dbc0eef395',
+    baseline='narendorf/socc-har-32-ph1/e2e01b66e31246419280edf18c20cf33',
+    #R2plus1D_34_32_2='narendorf/soccar-32-ph1/4488f5f18d7e438aad586eaa348edd60',
+    #R2plus1D_34_64_1='narendorf/soccar-32-ph1/5517708f1c684506ae5afca3bb50e63e',
+    #R2plus1D_34_48_2='narendorf/soccar-32-ph1/245fa59c071947d2a5b071dbc0eef395',
 
-    SlowFast_4x16_32_3='narendorf/soccar-32-ph1/a55cf7d521f044f998e9f24cd10b3a29',
-    SlowFast_4x16_48_2='narendorf/soccar-32-ph1/6fa6208f55724ff6b68e4b8e4e61b16b',
+    #SlowFast_4x16_32_3='narendorf/soccar-32-ph1/a55cf7d521f044f998e9f24cd10b3a29',
+    #SlowFast_4x16_48_2='narendorf/soccar-32-ph1/6fa6208f55724ff6b68e4b8e4e61b16b',
 
-    ir_CSN_4g_32_3='narendorf/soccar-32-ph1/b72644fe5e324948a6c8c5bdadd06ea6',
-    ir_CSN_4g_48_2='narendorf/soccar-32-ph1/ee68cb3f6dd14c66b2c68d1df72a818b',
+    #ir_CSN_4g_32_3='narendorf/soccar-32-ph1/b72644fe5e324948a6c8c5bdadd06ea6',
+    #ir_CSN_4g_48_2='narendorf/soccar-32-ph1/ee68cb3f6dd14c66b2c68d1df72a818b',
 )
 
 benchmarks = [phase_1, phase_2]

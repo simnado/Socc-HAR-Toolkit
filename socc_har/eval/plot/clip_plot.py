@@ -76,6 +76,7 @@ class ClipPlot:
 
         top_k = [pred[sort[i]] * 100 for i in range(5)]
         top_k_label = [self.classes[sort[i]] for i in range(5)]
+        axes.vlines([50], -0.5, -5.5)
         axes.barh(y=[-1, -2, -3, -4, -5], width=top_k, label=top_k_label, color='powderblue')
         for i in range(5):
             axes.annotate(top_k_label[i], xy=(5, -1 * (i + 1)))
