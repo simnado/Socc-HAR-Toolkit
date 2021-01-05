@@ -77,7 +77,7 @@ class Reporter(Callback):
                             'critical': info['critical'],
                             'index': int(info['index']),
                             'labels': ', '.join(
-                                [self.classes[idx] for idx in torch.arange(0, 32)[y[row] > 0] ])},
+                                [self.classes[idx] for idx in torch.arange(0, len(self.classes))[y[row] > 0] ])},
                            ignore_index=True)
 
         df['loss'] = data['losses'][worst_idx].tolist()

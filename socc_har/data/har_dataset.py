@@ -133,6 +133,9 @@ class HarDataset(Dataset):
             elif overlap > self.min_action_overlap:
                 # attach overlapping annotation
                 label = anno['label']
+                if label not in self.classes:
+                    # if class is excluded, ignore it
+                    continue
                 index = self.classes.index(label)
                 vec[index] = 1
                 json.append(anno)
