@@ -99,7 +99,7 @@ class Classifier(LightningModule):
         elif self.hparams.consensus == 'max':
             out = out.max(dim=1).values
         elif self.hparams.consensus == 'pool':
-            out = out.max(dim=1).values
+            out = out.reshape(batch_size, self.num_classes)
 
         assert len(out) == batch_size
 
