@@ -25,7 +25,7 @@ class Classifier(LightningModule):
                  trainable_groups=None,
                  **kwargs):
 
-        assert consensus in ['avg', 'max']
+        assert consensus in ['avg', 'max', 'pool']
 
         super().__init__()
         self.save_hyperparameters('weight_decay', 'epochs', 'scheduler', 'optim',
@@ -97,6 +97,8 @@ class Classifier(LightningModule):
         if self.hparams.consensus == 'avg':
             out = out.mean(dim=1)
         elif self.hparams.consensus == 'max':
+            out = out.max(dim=1).values
+        elif self.hparams.consensus == 'pool':
             out = out.max(dim=1).values
 
         assert len(out) == batch_size
