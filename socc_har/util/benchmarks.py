@@ -27,4 +27,8 @@ phase_2 = dict(
     # ir_CSN_4g_48_2='narendorf/soccar-32-ph1/ee68cb3f6dd14c66b2c68d1df72a818b',
 )
 
-benchmarks = [phase_1, phase_2]
+phase_3 = dict(
+    ir_CSN_verified_48_10_socc_har_28='narendorf/socc-har-32-ph2/7babc9c3f47d460b91f91e8cc8c768d7'
+)
+
+benchmarks = [phase_1, phase_2, phase_3]
