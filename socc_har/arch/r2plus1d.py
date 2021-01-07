@@ -16,7 +16,7 @@ class R2Plus1D_34(Backbone):
     def groups(self) -> [[nn.Module]]:
         return [[self.backbone.conv1], [self.backbone.layer1], [self.backbone.layer2], [self.backbone.layer3], [self.backbone.layer4], [self.cls_head]]
 
-    def __init__(self, num_classes: int):
+    def __init__(self, num_classes: int, label_smooth_eps=0.0):
         model = dict(
             type='Recognizer3D',
             backbone=dict(
@@ -42,5 +42,7 @@ class R2Plus1D_34(Backbone):
                 in_channels=512,
                 spatial_type='avg',
                 dropout_ratio=0.5,
-                init_std=0.01))
+                init_std=0.01,
+                label_smooth_eps=label_smooth_eps
+            ))
         super().__init__(model)

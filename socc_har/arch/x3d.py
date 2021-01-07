@@ -23,7 +23,7 @@ class X3D_S(X3D):
         url = 'https://download.openmmlab.com/mmaction/recognition/x3d/facebook/x3d_s_facebook_13x6x1_kinetics400_rgb_20201027-623825a0.pth'
         return Fetcher().load(url, Path('.'))
 
-    def __init__(self, num_classes: int):
+    def __init__(self, num_classes: int, label_smooth_eps=0.0):
         model = dict(
             type='Recognizer3D',
             backbone=dict(
@@ -41,7 +41,8 @@ class X3D_S(X3D):
                 num_classes=num_classes,
                 spatial_type='avg',
                 dropout_ratio=0.5,
-                fc1_bias=False
+                fc1_bias=False,
+                label_smooth_eps=label_smooth_eps
             )
         )
         super().__init__(model)
@@ -54,7 +55,7 @@ class X3D_M(X3D):
         url = 'https://download.openmmlab.com/mmaction/recognition/x3d/facebook/x3d_m_facebook_16x5x1_kinetics400_rgb_20201027-3f42382a.pth'
         return Fetcher().load(url, Path('.'))
 
-    def __init__(self, num_classes: int):
+    def __init__(self, num_classes: int, label_smooth_eps=0.0):
 
         model = dict(
             type='Recognizer3D',
@@ -71,7 +72,8 @@ class X3D_M(X3D):
                 num_classes=num_classes,
                 spatial_type='avg',
                 dropout_ratio=0.5,
-                fc1_bias=False
+                fc1_bias=False,
+                label_smooth_eps=label_smooth_eps
             )
         )
         super().__init__(model)
@@ -82,7 +84,7 @@ class X3D_L(X3D):
     def provide_pretrained_weights() -> Optional[Path]:
         return None
 
-    def __init__(self, num_classes: int):
+    def __init__(self, num_classes: int, label_smooth_eps=0.0):
 
         model = dict(
             type='Recognizer3D',
@@ -99,7 +101,8 @@ class X3D_L(X3D):
                 num_classes=num_classes,
                 spatial_type='avg',
                 dropout_ratio=0.5,
-                fc1_bias=False
+                fc1_bias=False,
+                label_smooth_eps=label_smooth_eps
             )
         )
         super().__init__(model)

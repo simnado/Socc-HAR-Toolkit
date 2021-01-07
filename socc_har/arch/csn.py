@@ -20,7 +20,7 @@ class irCSN_152(Backbone):
                 [self.backbone.layer4],
                 [self.cls_head]]
 
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, label_smooth_eps=0.0):
         model = dict(
             type='Recognizer3D',
             backbone=dict(
@@ -39,5 +39,7 @@ class irCSN_152(Backbone):
                 in_channels=2048,
                 spatial_type='avg',
                 dropout_ratio=0.5,
-                init_std=0.01))
+                init_std=0.01,
+                label_smooth_eps=label_smooth_eps
+            ))
         super().__init__(model)

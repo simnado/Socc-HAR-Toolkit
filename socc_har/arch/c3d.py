@@ -11,7 +11,7 @@ class C3D(Backbone):
         url = 'https://download.openmmlab.com/mmaction/recognition/c3d/c3d_sports1m_pretrain_20201016-dcc47ddc.pth'
         return Fetcher().load(url, Path('.'))
 
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, label_smooth_eps=0.0):
         model = dict(
             type='Recognizer3D',
             backbone=dict(
@@ -30,7 +30,9 @@ class C3D(Backbone):
                 in_channels=4096,
                 spatial_type=None,
                 dropout_ratio=0.5,
-                init_std=0.01))
+                init_std=0.01,
+                label_smooth_eps=label_smooth_eps
+            ))
         super().__init__(model)
 
     @property

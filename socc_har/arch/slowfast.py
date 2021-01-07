@@ -23,7 +23,7 @@ class SlowFast4x16_50(SlowFast):
         url = 'https://download.openmmlab.com/mmaction/recognition/slowfast/slowfast_r50_4x16x1_256e_kinetics400_rgb/slowfast_r50_4x16x1_256e_kinetics400_rgb_20200704-bcde7ed7.pth'
         return Fetcher().load(url, Path('.'))
 
-    def __init__(self, num_classes: int):
+    def __init__(self, num_classes: int, label_smooth_eps=0.0):
         model = dict(
             type='Recognizer3D',
             backbone=dict(
@@ -58,7 +58,9 @@ class SlowFast4x16_50(SlowFast):
                 in_channels=2304,  # 2048+256
                 num_classes=num_classes,
                 spatial_type='avg',
-                dropout_ratio=0.5))
+                dropout_ratio=0.5,
+                label_smooth_eps=label_smooth_eps
+            ))
         super().__init__(model)
 
 
@@ -69,7 +71,7 @@ class SlowFast8x8_50(SlowFast):
         url = 'https://download.openmmlab.com/mmaction/recognition/slowfast/slowfast_r50_8x8x1_256e_kinetics400_rgb/slowfast_r50_8x8x1_256e_kinetics400_rgb_20200716-73547d2b.pth'
         return Fetcher().load(url, Path('.'))
 
-    def __init__(self, num_classes: int):
+    def __init__(self, num_classes: int, label_smooth_eps=0.0):
         model = dict(
             type='Recognizer3D',
             backbone=dict(
@@ -105,5 +107,7 @@ class SlowFast8x8_50(SlowFast):
                 in_channels=2304,  # 2048+256
                 num_classes=num_classes,
                 spatial_type='avg',
-                dropout_ratio=0.5))
+                dropout_ratio=0.5,
+                label_smooth_eps=label_smooth_eps
+            ))
         super().__init__(model)
