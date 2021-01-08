@@ -18,7 +18,7 @@ class DataModule(LightningDataModule):
                  metadata_path: Optional[str],
                  batch_size=32,
                  classes=None, max_train_samples_per_class=500,
-                 num_data_workers=None, seed=2147483647,
+                 num_data_workers=None, seed=2147483647, train_segmentation_stride=1.0,
                  test_duration=6, num_test_crops=5, num_test_frames=None):
         super().__init__()
         self.seed = seed
@@ -36,6 +36,7 @@ class DataModule(LightningDataModule):
 
         self.database = DatabaseHandle(database_path)
 
+        self.train_segmentation_stride = train_segmentation_stride
         self.max_train_samples_per_class = max_train_samples_per_class
         self.batch_size = batch_size
         self.num_frames = num_frames
@@ -95,7 +96,8 @@ class DataModule(LightningDataModule):
                                                 video_metadata=self.video_metadata['train'],
                                                 res=self.res, classes=self.classes,
                                                 do_augmentation=True,
-                                                num_frames=self.num_frames, fps=self.fps, clip_offset=self.fps,
+                                                num_frames=self.num_frames, fps=self.fps,
+                                                clip_offset=self.fps * self.train_segmentation_stride,
                                                 num_chunks=1, allow_critical=self.allow_critical,
                                                 num_workers=0)
             self.stats['train'] = DataStats('train', self.datasets['train'], self.limit_per_class['train'], seed=self.seed)
