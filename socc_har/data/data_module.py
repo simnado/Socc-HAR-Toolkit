@@ -18,7 +18,7 @@ class DataModule(LightningDataModule):
                  metadata_path: Optional[str],
                  batch_size=32,
                  classes=None, max_train_samples_per_class=500,
-                 num_data_workers=None, seed=2147483647, train_segmentation_stride=1.0,
+                 num_data_workers=None, seed=2147483647, train_segmentation_stride=1,
                  test_duration=6, num_test_crops=5, num_test_frames=None):
         super().__init__()
         self.seed = seed

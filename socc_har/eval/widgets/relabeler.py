@@ -91,15 +91,15 @@ class Relabeler(Plotter):
         self.rl_segment.value = [0,0]
         if self.relabel_action == 'pass':
             self.rl_segment.disabled = True
-            labels = [(anno['label'], idx) for idx, anno in enumerate(self.nearby_actions) if 'verified' not in anno]
+            labels = [(anno['label'], idx) for idx, anno in enumerate(self.nearby_actions)]
             self.rl_label.options = labels
         elif self.relabel_action == 'add':
             self.rl_label.options = self.dm.classes
         elif self.relabel_action == 'edit':
-            labels = [(anno['label'], idx) for idx, anno in enumerate(self.nearby_actions) if 'verified' not in anno]
+            labels = [(anno['label'], idx) for idx, anno in enumerate(self.nearby_actions)]
             self.rl_label.options = labels
         elif self.relabel_action == 'delete':
-            labels = [(anno['label'], idx) for idx, anno in enumerate(self.nearby_actions) if 'verified' not in anno]
+            labels = [(anno['label'], idx) for idx, anno in enumerate(self.nearby_actions)]
             self.rl_label.options = labels
         self.rl_label.value = None
 
