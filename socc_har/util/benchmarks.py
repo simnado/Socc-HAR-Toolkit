@@ -28,8 +28,9 @@ phase_2 = dict(
 )
 
 phase_3 = dict(
-    ir_CSN_verified_48_10_socc_har_28='narendorf/socc-har-32-ph2/7babc9c3f47d460b91f91e8cc8c768d7',
-    ir_CSN_verified_48_10_socc_har_25='narendorf/socc-har-32-ph2/ce794db6206f43b8bcc146417f4e33bf'
+    ir_CSN_verified_224_48_10_socc_har_28='narendorf/socc-har-32-baselines/7babc9c3f47d460b91f91e8cc8c768d7',
+    ir_CSN_verified_224_48_10_socc_har_25='narendorf/socc-har-32-baselines/ce794db6206f43b8bcc146417f4e33bf',
+    ir_CSN_verified_240_48_10_socc_har_25='narendorf/socc-har-32-baselines/43942b9e0d9f4de2b3f500301dc61139',
 )
 
 benchmarks = [phase_1, phase_2, phase_3]

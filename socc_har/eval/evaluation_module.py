@@ -27,7 +27,7 @@ class EvaluationModule:
     def plot_background_ratio(self, context='all', save=False, upload=False):
         assert context in ['train', 'val', 'test', 'all']
 
-        fig, ax1 = plt.subplots(dpi=400)
+        fig, ax = plt.subplots(dpi=400)
 
         if context != 'all':
             bg_ratio = self.dm.stats[context].background_ratio
@@ -41,11 +41,13 @@ class EvaluationModule:
             pw_ratio = pw_samples / total_samples
             single_ratio = 1 - bg_ratio - pw_ratio
 
-        labels = 'Background', 'Single Action', 'Overlapping Actions'
+        labels = 'Background', 'Single Action', 'Intersections'
         sizes = [bg_ratio, single_ratio, pw_ratio]
 
-        ax1.pie(sizes, labels=labels, autopct='%1.1f%%')
-        ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+        df = pd.DataFrame({'count': sizes},
+                          index=['Background', 'Single Action', 'Intersections'])
+        plot = df.plot.pie(ax=ax, y='count', figsize=(5, 5), explode = (0.1, 0, 0), legend=False, ylabel='', autopct='%1.1f%%')
+
         plt.tight_layout()
         plt.close()
 
@@ -89,7 +91,7 @@ class EvaluationModule:
     def plot_pairwise_tuples(self, context='all', absolute=False, save=False, upload=False):
         assert context in ['train', 'val', 'test', 'all']
 
-        fig, ax = plt.subplots(figsize=(20, 20))
+        fig, ax = plt.subplots(figsize=(20, 17))
 
         if context != 'all':
             occs = self.dm.stats[context].pairwise_occs
@@ -103,11 +105,11 @@ class EvaluationModule:
             occs = torch.transpose(occs / torch.diag(occs) * 100, 0, 1)
 
         display = ConfusionMatrixDisplay(confusion_matrix=occs, display_labels=self.dm.classes)
-        ax.title.set_text(f'pairwise overlaps in {context} set')
+        ax.title.set_text(f'')
 
         display.plot(ax=ax, cmap=plt.cm.Blues, xticks_rotation='vertical', values_format='.2g')
         ax.set(ylabel="Samples",
-               xlabel="Overlaps")
+               xlabel="Intersections")
         plt.tight_layout()
 
         self._handle(fig, context, 'pairwise_occurrences', save, upload)
