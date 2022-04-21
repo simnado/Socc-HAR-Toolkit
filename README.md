@@ -1,5 +1,7 @@
 # Socc-HAR Toolkit
 
+Library and scripts to explore SOCC-HAR-32 Dataset and run experiments published in https://github.com/simnado/Master-Thesis.
+
 ## Notebooks
 
  * [Exploration of Socc-HAR-32](https://colab.research.google.com/drive/1rBi6GU8rCloI1013D8_bdS5vQ0wbhAiq)
